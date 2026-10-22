@@ -448,6 +448,189 @@
       </div>
     </section>
 
+    <!-- PHONE CAMERA OPTICAL PPG (ZERO WEARABLE RECOVERY SCAN) -->
+    <section class="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-rose-950/20 to-slate-950 border border-rose-900/30 shadow-lg relative overflow-hidden">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <div
+            class="w-2.5 h-2.5 rounded-full"
+            [ngClass]="ppg.scanState().isActive ? (ppg.scanState().isFingerDetected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500 animate-ping') : 'bg-slate-600'"
+          ></div>
+          <span class="text-[11px] font-mono uppercase tracking-wider font-semibold text-slate-300 flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            PHONE CAMERA PPG // ZERO-HARDWARE SCAN
+          </span>
+        </div>
+
+        <span
+          class="text-[9px] font-mono px-2 py-0.5 rounded-full border"
+          [ngClass]="ppg.scanState().isActive ? (ppg.scanState().isFingerDetected ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300' : 'bg-rose-500/10 border-rose-500/40 text-rose-300') : 'bg-slate-800/60 border-slate-700 text-slate-400'"
+        >
+          {{ ppg.scanState().isActive ? (ppg.scanState().isFingerDetected ? 'PULSE LOCKED' : 'ALIGN FINGER') : 'STANDBY' }}
+        </span>
+      </div>
+
+      <!-- Error Banner -->
+      <div
+        *ngIf="ppg.errorMessage()"
+        class="mb-3 p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/50 text-[11px] font-mono text-rose-300 flex items-center justify-between"
+      >
+        <span class="truncate mr-2">{{ ppg.errorMessage() }}</span>
+        <button
+          type="button"
+          (click)="ppg.errorMessage.set(null)"
+          class="shrink-0 px-2 py-0.5 rounded bg-rose-900/50 text-rose-200 text-[10px]"
+        >
+          DISMISS
+        </button>
+      </div>
+
+      <!-- Inactive State -->
+      <div *ngIf="!ppg.scanState().isActive" class="space-y-3">
+        <p class="text-xs text-slate-400 font-sans leading-relaxed">
+          No hardware band needed. Place your index finger gently over your phone's rear camera lens and flashlight. Vagus measures capillary blood volume changes at 30 fps to compute your <strong class="text-slate-200">Resting HR</strong> and <strong class="text-slate-200">RMSSD</strong>.
+        </p>
+
+        <button
+          type="button"
+          (click)="startCameraPpg(45)"
+          class="w-full py-2.5 px-4 rounded-xl font-mono text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-rose-600 via-rose-500 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white shadow-md active:scale-[0.99] cursor-pointer"
+        >
+          <span>📸 START CAMERA PPG SCAN (45 SEC)</span>
+        </button>
+      </div>
+
+      <!-- Active Scan State -->
+      <div *ngIf="ppg.scanState().isActive" class="space-y-3">
+        <!-- Status instruction -->
+        <div
+          class="p-2.5 rounded-xl border text-center font-mono text-xs transition-colors"
+          [ngClass]="ppg.scanState().isFingerDetected ? 'bg-emerald-950/30 border-emerald-800/50 text-emerald-300' : 'bg-rose-950/40 border-rose-800/60 text-rose-300'"
+        >
+          {{ ppg.scanState().statusMessage }}
+        </div>
+
+        <!-- Progress bar -->
+        <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+          <div
+            class="h-full bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-400 transition-all duration-1000 ease-linear"
+            [style.width.%]="((ppg.scanState().durationSeconds - ppg.scanState().remainingSeconds) / ppg.scanState().durationSeconds) * 100"
+          ></div>
+        </div>
+
+        <!-- Real-time metrics grid -->
+        <div class="grid grid-cols-4 gap-2 font-mono text-center text-xs">
+          <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
+            <div class="text-[9px] text-slate-400 uppercase">REMAINING</div>
+            <div class="font-bold text-amber-300 mt-0.5">{{ ppg.scanState().remainingSeconds }}s</div>
+          </div>
+          <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
+            <div class="text-[9px] text-slate-400 uppercase">BEATS</div>
+            <div class="font-bold text-slate-100 mt-0.5">{{ ppg.scanState().capturedIBIs.length }}</div>
+          </div>
+          <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
+            <div class="text-[9px] text-slate-400 uppercase">LIVE BPM</div>
+            <div class="font-bold text-rose-400 mt-0.5">{{ ppg.scanState().liveBpm || '--' }}</div>
+          </div>
+          <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
+            <div class="text-[9px] text-slate-400 uppercase">RMSSD</div>
+            <div class="font-bold text-emerald-400 mt-0.5">{{ ppg.scanState().currentRMSSD }} ms</div>
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <button
+            type="button"
+            (click)="stopCameraPpg(true)"
+            [disabled]="ppg.scanState().capturedIBIs.length < 5"
+            class="flex-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-mono text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer"
+          >
+            COMPLETE & COMMIT
+          </button>
+          <button
+            type="button"
+            (click)="stopCameraPpg(false)"
+            class="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 font-mono text-xs transition-colors cursor-pointer"
+          >
+            CANCEL
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- XIAOMI SMART BAND 8 / 9 INTEGRATION HUB -->
+    <section class="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-amber-950/20 to-slate-950 border border-amber-900/30 shadow-lg relative overflow-hidden">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
+          <span class="text-[11px] font-mono uppercase tracking-wider font-semibold text-slate-300 flex items-center gap-1.5">
+            XIAOMI SMART BAND 8 / 9 // HUB
+          </span>
+        </div>
+
+        <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300">
+          $35 WHOOP SETUP
+        </span>
+      </div>
+
+      <div class="space-y-4">
+        <!-- Method 1: BLE Broadcast Mode -->
+        <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+          <div class="text-xs font-bold font-mono text-amber-300 uppercase">
+            1. LIVE BLUETOOTH BROADCAST MODE
+          </div>
+          <p class="text-xs text-slate-400 font-sans leading-relaxed">
+            In the <strong class="text-slate-200">Mi Fitness</strong> app: Go to <span class="font-mono text-slate-300 text-[11px]">Device &rarr; Band Settings &rarr; Heart Rate Sharing / Broadcast</span> and toggle it <strong>ON</strong>. Then tap <strong class="text-indigo-300">Pair Polar / BLE</strong> above to stream live Xiaomi HR into Vagus!
+          </p>
+        </div>
+
+        <!-- Method 2: Mi Fitness / Gadgetbridge JSON Import -->
+        <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="text-xs font-bold font-mono text-amber-300 uppercase">
+              2. IMPORT SLEEP & BIOMETRICS JSON
+            </div>
+            <span *ngIf="xiaomi.isImporting()" class="text-[10px] font-mono text-amber-400 animate-pulse">
+              IMPORTING...
+            </span>
+          </div>
+
+          <p class="text-xs text-slate-400 font-sans leading-relaxed">
+            Upload your exported <strong class="text-slate-200">Mi Fitness</strong> or <strong class="text-slate-200">Gadgetbridge</strong> JSON file to automatically ingest nocturnal Deep/REM sleep stages, resting HR, and steps:
+          </p>
+
+          <label class="block mt-2">
+            <input
+              type="file"
+              accept=".json"
+              (change)="onXiaomiFileSelected($event)"
+              class="block w-full text-xs font-mono text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-amber-500/20 file:text-amber-300 hover:file:bg-amber-500/30 file:cursor-pointer cursor-pointer"
+            />
+          </label>
+
+          <!-- Import Error -->
+          <div *ngIf="xiaomi.importError()" class="p-2 rounded bg-rose-950/40 border border-rose-800/40 text-[10px] font-mono text-rose-300">
+            {{ xiaomi.importError() }}
+          </div>
+
+          <!-- Successful Import Summary -->
+          <div *ngIf="xiaomi.lastImport()" class="mt-2 p-3 rounded-xl bg-emerald-950/30 border border-emerald-800/40 font-mono text-xs text-emerald-300 space-y-1">
+            <div class="font-bold text-[11px] uppercase text-emerald-200">
+              ✓ Successfully Ingested Xiaomi Biometrics ({{ xiaomi.lastImport()?.date }})
+            </div>
+            <div class="grid grid-cols-3 gap-2 pt-1 text-[10px] text-slate-300">
+              <div>SLEEP: <span class="font-bold text-white">{{ formatMinutesToHours(xiaomi.lastImport()?.totalSleepMin || 0) }}</span></div>
+              <div>DEEP/REM: <span class="font-bold text-white">{{ xiaomi.lastImport()?.deepSleepMin }}m / {{ xiaomi.lastImport()?.remSleepMin }}m</span></div>
+              <div>RECOVERY: <span class="font-bold text-emerald-400">{{ xiaomi.lastImport()?.calculatedRecovery }}%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- LIVE DUAL-OS STEP TELEMETRY BLOCK (AUTOMATIC IOS & ANDROID) -->
     <section class="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800/90 shadow-md">
       <div class="flex items-center justify-between mb-3">

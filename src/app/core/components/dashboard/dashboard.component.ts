@@ -5,6 +5,8 @@ import { DataBridgeService } from '../../services/data-bridge.service';
 import { PhysicsEngineService } from '../../services/physics-engine.service';
 import { PedometerService } from '../../services/pedometer.service';
 import { BleHeartRateService } from '../../services/ble-heart-rate.service';
+import { CameraPpgService } from '../../services/camera-ppg.service';
+import { XiaomiIntegrationService } from '../../services/xiaomi-integration.service';
 import { DailyBiometricLog, JournalHabits } from '../../models/biometrics.interface';
 
 @Component({
@@ -20,6 +22,8 @@ export class DashboardComponent implements OnInit {
   private readonly physicsEngine = inject(PhysicsEngineService);
   public readonly pedometer = inject(PedometerService);
   public readonly bleHR = inject(BleHeartRateService);
+  public readonly ppg = inject(CameraPpgService);
+  public readonly xiaomi = inject(XiaomiIntegrationService);
 
   // Active user ID derived from Auth state
   public readonly activeUserId = computed(() => {
@@ -212,6 +216,31 @@ export class DashboardComponent implements OnInit {
     } else {
       this.bleHR.startWorkout();
     }
+  }
+
+  // Camera PPG Actions
+  public async startCameraPpg(duration: number = 45): Promise<void> {
+    await this.ppg.startPpgScan(duration);
+  }
+
+  public stopCameraPpg(save: boolean = true): void {
+    this.ppg.stopPpgScan(save);
+  }
+
+  // Xiaomi JSON file importer
+  public onXiaomiFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const content = e.target?.result as string;
+      if (content) {
+        await this.xiaomi.parseAndIngestXiaomiJson(content, this.activeUserId());
+      }
+    };
+    reader.readAsText(file);
   }
 
   public formatMinutesToHours(minutes: number): string {
