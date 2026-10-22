@@ -80,3 +80,21 @@ export interface RawSleepSession {
   awakeMinutes: number;
   avgHeartRate: number;
 }
+
+/**
+ * Canonical Firestore User Document
+ * Located at: users/{userId}
+ */
+export interface UserProfileDocument {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  createdAt: string;
+  lastLoginAt: string;
+  baseline: UserPhysiologyBaseline;
+  settings?: {
+    dailyStepGoal: number;
+    metricUnits: boolean;
+  };
+}

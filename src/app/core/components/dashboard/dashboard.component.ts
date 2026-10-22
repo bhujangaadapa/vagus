@@ -1,5 +1,6 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { AuthService } from '../../services/auth.service';
 import { DataBridgeService } from '../../services/data-bridge.service';
 import { PhysicsEngineService } from '../../services/physics-engine.service';
 import { PedometerService } from '../../services/pedometer.service';
@@ -13,11 +14,15 @@ import { DailyBiometricLog, JournalHabits } from '../../models/biometrics.interf
   styleUrls: ['./dashboard.component.css'],
 })
 export class DashboardComponent implements OnInit {
+  public readonly authService = inject(AuthService);
   private readonly dataBridge = inject(DataBridgeService);
   private readonly physicsEngine = inject(PhysicsEngineService);
   public readonly pedometer = inject(PedometerService);
 
-  public readonly userId = 'pilot_athlete_01';
+  // Active user ID derived from Auth state
+  public readonly activeUserId = computed(() => {
+    return this.authService.currentUser()?.uid || 'pilot_athlete_01';
+  });
 
   // Reactive state signals
   public readonly todayLog = signal<DailyBiometricLog | null>(null);
@@ -30,20 +35,20 @@ export class DashboardComponent implements OnInit {
   public readonly strainScore = computed(() => this.todayLog()?.scores.calculatedStrain ?? 0.0);
 
   // Live Step telemetry
-  public readonly stepGoal = 10000;
+  public readonly stepGoal = computed(() => {
+    return this.authService.userProfile()?.settings?.dailyStepGoal || 10000;
+  });
   public readonly liveSteps = computed(() => {
     return this.pedometer.currentSteps() || (this.todayLog()?.biometrics.steps ?? 0);
   });
   public readonly stepProgressPercent = computed(() => {
-    return Math.min(100, Math.round((this.liveSteps() / this.stepGoal) * 100));
+    return Math.min(100, Math.round((this.liveSteps() / this.stepGoal()) * 100));
   });
   public readonly estimatedDistanceKm = computed(() => {
-    // Standard adult stride length ~0.762 meters
     const km = (this.liveSteps() * 0.762) / 1000;
     return (Math.round(km * 100) / 100).toFixed(2);
   });
   public readonly estimatedActiveCalories = computed(() => {
-    // ~0.04 kcal per step for average 70kg individual
     return Math.round(this.liveSteps() * 0.04);
   });
 
@@ -80,8 +85,20 @@ export class DashboardComponent implements OnInit {
     return logs.slice(-7);
   });
 
+  constructor() {
+    // Whenever active user changes, reload daily logs
+    effect(() => {
+      const uid = this.activeUserId();
+      this.dataBridge.getDailyLogs(uid).subscribe((logs) => {
+        this.historyLogs.set(logs);
+        if (logs.length > 0) {
+          this.todayLog.set(logs[logs.length - 1]);
+        }
+      });
+    });
+  }
+
   public ngOnInit(): void {
-    // Initial fetch and subscribe
     this.dataBridge.logs$.subscribe((logs) => {
       this.historyLogs.set(logs);
       if (logs.length > 0 && !this.todayLog()) {
@@ -95,8 +112,19 @@ export class DashboardComponent implements OnInit {
       }
     });
 
-    // Auto seed initial data if empty
     this.seedInitialData();
+  }
+
+  public async loginGoogle(): Promise<void> {
+    const user = await this.authService.loginWithGoogle();
+    if (user) {
+      await this.seedInitialData();
+    }
+  }
+
+  public async logout(): Promise<void> {
+    await this.authService.logout();
+    await this.seedInitialData();
   }
 
   public async togglePhoneSteps(): Promise<void> {
@@ -104,7 +132,7 @@ export class DashboardComponent implements OnInit {
       await this.pedometer.stopTracking();
     } else {
       const today = this.todayLog()?.date;
-      await this.pedometer.startTracking(this.userId, today);
+      await this.pedometer.startTracking(this.activeUserId(), today);
     }
   }
 
@@ -115,14 +143,13 @@ export class DashboardComponent implements OnInit {
   public async requestPermissions(): Promise<void> {
     const result = await this.dataBridge.requestHealthPermissions();
     this.permissionGranted.set(result.success);
-    // Also initiate step tracking
-    await this.pedometer.startTracking(this.userId, this.todayLog()?.date);
+    await this.pedometer.startTracking(this.activeUserId(), this.todayLog()?.date);
   }
 
   public async seedInitialData(): Promise<void> {
     this.isSeeding.set(true);
     try {
-      const seeded = await this.dataBridge.seed30DayHistory(this.userId);
+      const seeded = await this.dataBridge.seed30DayHistory(this.activeUserId());
       if (seeded && seeded.length > 0) {
         this.todayLog.set(seeded[seeded.length - 1]);
       }
@@ -137,7 +164,7 @@ export class DashboardComponent implements OnInit {
 
     const currentValue = current.journalHabits[habitKey];
     const updated = await this.dataBridge.updateJournalHabits(
-      this.userId,
+      this.activeUserId(),
       current.date,
       { [habitKey]: !currentValue }
     );

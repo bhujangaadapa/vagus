@@ -1,7 +1,7 @@
 <div class="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-start max-w-md mx-auto shadow-2xl border-x border-slate-900">
   
   <!-- Header Telemetry Bar -->
-  <header class="px-5 py-4 border-b border-slate-900 flex items-center justify-between bg-slate-950/80 backdrop-blur sticky top-0 z-20">
+  <header class="px-5 py-3 border-b border-slate-900 flex items-center justify-between bg-slate-950/80 backdrop-blur sticky top-0 z-20">
     <div class="flex items-center gap-2">
       <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
       <h1 class="font-mono tracking-widest text-xs uppercase font-semibold text-slate-300">
@@ -28,6 +28,76 @@
       </button>
     </div>
   </header>
+
+  <!-- User Account & Document Identity Banner -->
+  <section class="px-5 py-3 bg-slate-900/40 border-b border-slate-900">
+    <!-- Logged In State -->
+    <div *ngIf="authService.currentUser() as user; else loggedOutState" class="flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <img
+          *ngIf="user.photoURL; else defaultAvatar"
+          [src]="user.photoURL"
+          alt="Avatar"
+          class="w-8 h-8 rounded-full border border-emerald-500/40 object-cover"
+        />
+        <ng-template #defaultAvatar>
+          <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-mono text-xs font-bold text-emerald-400">
+            {{ (user.displayName || user.email || 'U').charAt(0).toUpperCase() }}
+          </div>
+        </ng-template>
+
+        <div class="leading-tight">
+          <div class="text-xs font-mono font-semibold text-slate-200 truncate max-w-[170px]">
+            {{ user.displayName || user.email }}
+          </div>
+          <div class="text-[9px] font-mono text-slate-500 truncate max-w-[170px]">
+            users/{{ user.uid.slice(0, 12) }}...
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="text-[9px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40">
+          DOC SYNCED
+        </span>
+        <button
+          type="button"
+          (click)="logout()"
+          class="text-[10px] font-mono px-2 py-1 rounded bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/60 transition-colors"
+        >
+          LOGOUT
+        </button>
+      </div>
+    </div>
+
+    <!-- Logged Out State: Google Sign-In -->
+    <ng-template #loggedOutState>
+      <div class="flex items-center justify-between">
+        <div class="leading-tight">
+          <div class="text-xs font-mono text-slate-300 font-medium">GUEST SESSION</div>
+          <div class="text-[10px] font-mono text-slate-500">Sign in to maintain your user document</div>
+        </div>
+
+        <button
+          type="button"
+          (click)="loginGoogle()"
+          [disabled]="authService.isLoading()"
+          class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white text-slate-900 hover:bg-slate-100 font-mono text-xs font-semibold shadow transition-all disabled:opacity-50"
+        >
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24Z"/>
+            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15Z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"/>
+          </svg>
+          <span>{{ authService.isLoading() ? 'SIGNING IN...' : 'GOOGLE SIGN IN' }}</span>
+        </button>
+      </div>
+      <div *ngIf="authService.authError()" class="mt-1 text-[10px] font-mono text-amber-400">
+        {{ authService.authError() }}
+      </div>
+    </ng-template>
+  </section>
 
   <!-- Main Scrollable Diagnostics Viewport -->
   <main class="flex-1 p-5 space-y-6 overflow-y-auto">
@@ -161,20 +231,18 @@
         </span>
       </div>
 
-      <!-- Step Counter & Progress -->
       <div class="flex items-baseline justify-between my-2">
         <div>
           <span class="text-4xl font-mono font-bold tracking-tight text-slate-100">
             {{ liveSteps() | number }}
           </span>
-          <span class="text-xs font-mono text-slate-400 ml-1.5">/ {{ stepGoal | number }} STEPS</span>
+          <span class="text-xs font-mono text-slate-400 ml-1.5">/ {{ stepGoal() | number }} STEPS</span>
         </div>
         <div class="text-right">
           <span class="text-sm font-mono font-bold text-emerald-400">{{ stepProgressPercent() }}%</span>
         </div>
       </div>
 
-      <!-- Step Goal Progress Bar -->
       <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden my-2">
         <div
           class="h-full bg-gradient-to-r from-emerald-500 to-teal-300 rounded-full transition-all duration-500 ease-out"
@@ -182,7 +250,6 @@
         ></div>
       </div>
 
-      <!-- Cadence, Distance & Calorie Telemetry -->
       <div class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-800/60 font-mono text-center">
         <div>
           <div class="text-[9px] text-slate-500 uppercase">CADENCE</div>
@@ -204,7 +271,6 @@
         </div>
       </div>
 
-      <!-- Sensor Control Buttons -->
       <div class="flex gap-2 mt-4">
         <button
           type="button"
@@ -225,7 +291,6 @@
         </button>
       </div>
 
-      <!-- Sensor Status Micro-Feed -->
       <div class="mt-2.5 text-[10px] font-mono text-slate-500 text-center truncate">
         {{ pedometer.statusMessage() }}
       </div>
