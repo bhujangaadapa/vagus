@@ -122,6 +122,8 @@ export class DashboardComponent implements OnInit {
     effect(() => {
       const uid = this.activeUserId();
       this.dataBridge.setActiveUserId(uid);
+      this.bleHR.setActiveUserId(uid);
+      this.ppg.setActiveUserId(uid);
       this.dataBridge.getDailyLogs(uid).subscribe((logs) => {
         this.historyLogs.set(logs);
         if (logs.length > 0) {
@@ -244,11 +246,16 @@ export class DashboardComponent implements OnInit {
 
   // Camera PPG Actions
   public async startCameraPpg(duration: number = 45): Promise<void> {
+    this.ppg.setActiveUserId(this.activeUserId());
     await this.ppg.startPpgScan(duration);
   }
 
   public stopCameraPpg(save: boolean = true): void {
-    this.ppg.stopPpgScan(save);
+    if (save) {
+      this.ppg.completePpgScan(this.activeUserId());
+    } else {
+      this.ppg.stopPpgScan(false);
+    }
   }
 
   // Xiaomi JSON file importer

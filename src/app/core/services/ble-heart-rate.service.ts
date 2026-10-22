@@ -46,6 +46,12 @@ export class BleHeartRateService {
   public readonly lastRRIntervalMs = signal<number | null>(null);
   public readonly errorMessage = signal<string | null>(null);
 
+  private activeUserId = 'pilot_athlete_01';
+
+  public setActiveUserId(uid: string): void {
+    this.activeUserId = uid;
+  }
+
   // Morning Readiness Scan session
   public readonly scanSession = signal<BleScanSession>({
     isActive: false,
@@ -300,15 +306,16 @@ export class BleHeartRateService {
   /**
    * Finalize Morning Readiness Scan and persist medical-grade RMSSD into Vagus
    */
-  public async completeReadinessScan(): Promise<{ rmssd: number; rhr: number }> {
+  public async completeReadinessScan(userId?: string): Promise<{ rmssd: number; rhr: number }> {
     const session = this.scanSession();
     this.scanSession.set({ ...session, isActive: false });
 
     const finalRMSSD = this.physicsEngine.calculateRMSSD(session.capturedRRIntervals);
     const finalRHR = session.meanBpm || this.liveBpm() || 55;
+    const targetUid = userId || this.activeUserId;
 
     // Push into DataBridge / Firestore
-    await this.dataBridge.recordReadinessScan(finalRMSSD, finalRHR);
+    await this.dataBridge.recordReadinessScan(finalRMSSD, finalRHR, targetUid);
 
     return { rmssd: finalRMSSD, rhr: finalRHR };
   }

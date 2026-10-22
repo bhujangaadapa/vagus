@@ -53,6 +53,51 @@ export class DataBridgeService {
   private readonly todayLogSubject = new BehaviorSubject<DailyBiometricLog | null>(null);
   public readonly todayLog$: Observable<DailyBiometricLog | null> = this.todayLogSubject.asObservable();
 
+  constructor() {
+    // Instant offline-first hydration from localStorage on app boot / page refresh
+    const cached = this.loadFromLocalStorage(this.activeUserId);
+    if (cached.today) {
+      this.todayLogSubject.next(cached.today);
+    }
+    if (cached.history.length > 0) {
+      this.logsSubject.next(cached.history);
+    }
+  }
+
+  public saveToLocalStorage(userId: string, todayLog: DailyBiometricLog, historyLogs?: DailyBiometricLog[]): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(`vagus_today_log_${userId}`, JSON.stringify(todayLog));
+      localStorage.setItem('vagus_latest_today_log', JSON.stringify(todayLog));
+      if (historyLogs && historyLogs.length > 0) {
+        localStorage.setItem(`vagus_logs_cache_${userId}`, JSON.stringify(historyLogs));
+      }
+    } catch (e) {
+      console.warn('[DataBridge] LocalStorage save error:', e);
+    }
+  }
+
+  public loadFromLocalStorage(userId: string): { today: DailyBiometricLog | null; history: DailyBiometricLog[] } {
+    if (typeof localStorage === 'undefined') return { today: null, history: [] };
+    try {
+      const todayStr = this.getFormattedDate(new Date());
+      const rawToday = localStorage.getItem(`vagus_today_log_${userId}`) || localStorage.getItem('vagus_latest_today_log');
+      const rawHistory = localStorage.getItem(`vagus_logs_cache_${userId}`);
+
+      let today: DailyBiometricLog | null = rawToday ? JSON.parse(rawToday) : null;
+      let history: DailyBiometricLog[] = rawHistory ? JSON.parse(rawHistory) : [];
+
+      if (today && today.date !== todayStr) {
+        // Cached day is an older calendar day
+        today = null;
+      }
+
+      return { today, history };
+    } catch {
+      return { today: null, history: [] };
+    }
+  }
+
   /**
    * Request native permissions for HeartRate and SleepSession via Health Connect
    * Falls back gracefully if running in a standard web browser environment.
@@ -98,29 +143,62 @@ export class DataBridgeService {
    * Listen to real-time daily biometric logs from Firestore: users/{userId}/daily_logs
    */
   public getDailyLogs(userId: string): Observable<DailyBiometricLog[]> {
+    this.activeUserId = userId;
+    const todayStr = this.getFormattedDate(new Date());
+
+    // Instant offline-first hydration from localStorage so there is zero flash of blank data
+    const initialCached = this.loadFromLocalStorage(userId);
+    if (initialCached.today && (!this.todayLogSubject.value || this.todayLogSubject.value.scores.calculatedRecovery === 0)) {
+      this.todayLogSubject.next(initialCached.today);
+    }
+    if (initialCached.history.length > 0 && this.logsSubject.value.length === 0) {
+      this.logsSubject.next(initialCached.history);
+    }
+
     try {
       const logsCollectionRef = collection(this.firestore, `users/${userId}/daily_logs`);
       const logsQuery = query(logsCollectionRef, orderBy('date', 'asc'));
 
       return (collectionData(logsQuery, { idField: 'date' }) as Observable<DailyBiometricLog[]>).pipe(
         tap(async (logs) => {
-          const todayStr = this.getFormattedDate(new Date());
-
           if (logs && logs.length > 0) {
             this.logsSubject.next(logs);
             let today = logs.find((l) => l.date === todayStr);
 
-            // Autonomous midnight rollover: If a new calendar day has started,
-            // automatically initialize today's fresh log without erasing history!
+            // If Firestore doesn't have today's log or has 0s, but localStorage has valid scanned biometrics, merge them!
+            const localCached = this.loadFromLocalStorage(userId);
+            if (localCached.today && localCached.today.date === todayStr && localCached.today.biometrics.overnightRMSSD > 0) {
+              if (!today || today.biometrics.overnightRMSSD === 0) {
+                today = { ...today, ...localCached.today };
+                // Write back merged recovery to Firestore
+                try {
+                  const docRef = doc(this.firestore, `users/${userId}/daily_logs/${todayStr}`);
+                  await setDoc(docRef, today, { merge: true });
+                } catch {}
+              }
+            }
+
             if (!today) {
               today = await this.initializeAutonomousDay(userId, todayStr, logs);
             }
 
             this.todayLogSubject.next(today);
+            this.saveToLocalStorage(userId, today, logs);
           } else {
-            // First time ever: initialize today's clean record
-            const today = await this.initializeAutonomousDay(userId, todayStr, []);
-            this.todayLogSubject.next(today);
+            // Check local storage before wiping to clean day
+            const localCached = this.loadFromLocalStorage(userId);
+            if (localCached.today && localCached.today.date === todayStr) {
+              this.todayLogSubject.next(localCached.today);
+              this.saveToLocalStorage(userId, localCached.today, [localCached.today]);
+              try {
+                const docRef = doc(this.firestore, `users/${userId}/daily_logs/${todayStr}`);
+                await setDoc(docRef, localCached.today, { merge: true });
+              } catch {}
+            } else {
+              const today = await this.initializeAutonomousDay(userId, todayStr, []);
+              this.todayLogSubject.next(today);
+              this.saveToLocalStorage(userId, today, [today]);
+            }
           }
         }),
         catchError((err) => {
@@ -272,6 +350,9 @@ export class DataBridgeService {
     }
     this.logsSubject.next(updatedList);
     this.todayLogSubject.next(baseLog);
+
+    // Save to LocalStorage immediately
+    this.saveToLocalStorage(userId, baseLog, updatedList);
 
     // Persist to Firestore
     try {
@@ -426,6 +507,7 @@ export class DataBridgeService {
     if (current) {
       current.biometrics.steps = steps;
       this.todayLogSubject.next({ ...current });
+      this.saveToLocalStorage(userId, current);
     }
 
     try {
@@ -511,6 +593,9 @@ export class DataBridgeService {
     this.logsSubject.next(updatedList);
     this.todayLogSubject.next(baseLog);
 
+    // Save to LocalStorage immediately so refresh NEVER wipes data
+    this.saveToLocalStorage(targetUid, baseLog, updatedList);
+
     // Persist to Firestore
     try {
       const docRef = doc(this.firestore, `users/${targetUid}/daily_logs/${todayStr}`);
@@ -577,6 +662,9 @@ export class DataBridgeService {
     }
     this.logsSubject.next(updatedList);
     this.todayLogSubject.next(baseLog);
+
+    // Save to LocalStorage immediately
+    this.saveToLocalStorage(targetUid, baseLog, updatedList);
 
     // Persist to Firestore
     try {

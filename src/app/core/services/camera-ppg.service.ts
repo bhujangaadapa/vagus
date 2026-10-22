@@ -38,6 +38,12 @@ export class CameraPpgService {
   });
   public readonly errorMessage = signal<string | null>(null);
 
+  private activeUserId = 'pilot_athlete_01';
+
+  public setActiveUserId(uid: string): void {
+    this.activeUserId = uid;
+  }
+
   // Video / Canvas processing references
   private mediaStream: MediaStream | null = null;
   private videoElement: HTMLVideoElement | null = null;
@@ -312,7 +318,7 @@ export class CameraPpgService {
   /**
    * Complete PPG scan, compute RMSSD and commit to Firestore
    */
-  public async completePpgScan(): Promise<{ rmssd: number; rhr: number }> {
+  public async completePpgScan(userId?: string): Promise<{ rmssd: number; rhr: number }> {
     if (this.timerInterval) clearInterval(this.timerInterval);
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     if (this.mediaStream) {
@@ -329,9 +335,10 @@ export class CameraPpgService {
 
     const finalRMSSD = this.physicsEngine.calculateRMSSD(state.capturedIBIs);
     const finalRHR = state.liveBpm || 62;
+    const targetUid = userId || this.activeUserId;
 
     if (state.capturedIBIs.length >= 5) {
-      await this.dataBridge.recordReadinessScan(finalRMSSD, finalRHR);
+      await this.dataBridge.recordReadinessScan(finalRMSSD, finalRHR, targetUid);
     }
 
     return { rmssd: finalRMSSD, rhr: finalRHR };
