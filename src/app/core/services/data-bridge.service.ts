@@ -255,6 +255,24 @@ export class DataBridgeService {
   }
 
   /**
+   * Update live step count from phone pedometer / accelerometer sensor
+   */
+  public async updateLiveSteps(userId: string, dateStr: string, steps: number): Promise<void> {
+    const current = this.todayLogSubject.value;
+    if (current) {
+      current.biometrics.steps = steps;
+      this.todayLogSubject.next({ ...current });
+    }
+
+    try {
+      const docRef = doc(this.firestore, `users/${userId}/daily_logs/${dateStr}`);
+      await setDoc(docRef, { biometrics: { steps } }, { merge: true });
+    } catch {
+      // Local fallback
+    }
+  }
+
+  /**
    * Robust Mock Fallback Generator
    * Seeds a realistic 30-day chronological timeline of biometrics directly into Firestore.
    */
@@ -370,6 +388,7 @@ export class DataBridgeService {
       deepSleepMinutes,
       remSleepMinutes,
       avgSleepHR,
+      steps: Math.round(6500 + Math.sin(dayOffset * 1.5) * 3200 + (isHardWorkoutDay ? 4500 : 0)),
     };
 
     const journalHabits: JournalHabits = {

@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DataBridgeService } from '../../services/data-bridge.service';
 import { PhysicsEngineService } from '../../services/physics-engine.service';
+import { PedometerService } from '../../services/pedometer.service';
 import { DailyBiometricLog, JournalHabits } from '../../models/biometrics.interface';
 
 @Component({
@@ -14,6 +15,7 @@ import { DailyBiometricLog, JournalHabits } from '../../models/biometrics.interf
 export class DashboardComponent implements OnInit {
   private readonly dataBridge = inject(DataBridgeService);
   private readonly physicsEngine = inject(PhysicsEngineService);
+  public readonly pedometer = inject(PedometerService);
 
   public readonly userId = 'pilot_athlete_01';
 
@@ -26,6 +28,24 @@ export class DashboardComponent implements OnInit {
   // Computed properties
   public readonly recoveryScore = computed(() => this.todayLog()?.scores.calculatedRecovery ?? 0);
   public readonly strainScore = computed(() => this.todayLog()?.scores.calculatedStrain ?? 0.0);
+
+  // Live Step telemetry
+  public readonly stepGoal = 10000;
+  public readonly liveSteps = computed(() => {
+    return this.pedometer.currentSteps() || (this.todayLog()?.biometrics.steps ?? 0);
+  });
+  public readonly stepProgressPercent = computed(() => {
+    return Math.min(100, Math.round((this.liveSteps() / this.stepGoal) * 100));
+  });
+  public readonly estimatedDistanceKm = computed(() => {
+    // Standard adult stride length ~0.762 meters
+    const km = (this.liveSteps() * 0.762) / 1000;
+    return (Math.round(km * 100) / 100).toFixed(2);
+  });
+  public readonly estimatedActiveCalories = computed(() => {
+    // ~0.04 kcal per step for average 70kg individual
+    return Math.round(this.liveSteps() * 0.04);
+  });
 
   public readonly recoveryColor = computed(() => {
     const score = this.recoveryScore();
@@ -79,9 +99,24 @@ export class DashboardComponent implements OnInit {
     this.seedInitialData();
   }
 
+  public async togglePhoneSteps(): Promise<void> {
+    if (this.pedometer.isTracking()) {
+      await this.pedometer.stopTracking();
+    } else {
+      const today = this.todayLog()?.date;
+      await this.pedometer.startTracking(this.userId, today);
+    }
+  }
+
+  public simulateTestSteps(): void {
+    this.pedometer.simulateStride(25);
+  }
+
   public async requestPermissions(): Promise<void> {
     const result = await this.dataBridge.requestHealthPermissions();
     this.permissionGranted.set(result.success);
+    // Also initiate step tracking
+    await this.pedometer.startTracking(this.userId, this.todayLog()?.date);
   }
 
   public async seedInitialData(): Promise<void> {

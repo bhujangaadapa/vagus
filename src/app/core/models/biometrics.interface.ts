@@ -11,6 +11,7 @@ export interface DailyBiometrics {
   deepSleepMinutes: number;    // Slow-wave deep sleep in minutes
   remSleepMinutes: number;     // Rapid Eye Movement sleep in minutes
   avgSleepHR: number;          // Average heart rate during nocturnal sleep in bpm
+  steps: number;               // Accumulated daily footsteps from Android device sensor
 }
 
 export interface JournalHabits {

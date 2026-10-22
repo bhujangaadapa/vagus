@@ -45,7 +45,6 @@
       <div class="relative w-48 h-48 flex items-center justify-center">
         <!-- SVG Radial Progress Ring -->
         <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 160 160">
-          <!-- Background track -->
           <circle
             cx="80"
             cy="80"
@@ -55,7 +54,6 @@
             fill="transparent"
             class="text-slate-800/50"
           />
-          <!-- Progress indicator -->
           <circle
             cx="80"
             cy="80"
@@ -119,7 +117,6 @@
 
       <!-- Logarithmic Strain Scale Track -->
       <div class="relative w-full h-3 bg-slate-800 rounded-full overflow-hidden my-2">
-        <!-- Target Band Range Indicator -->
         <div
           class="absolute top-0 bottom-0 bg-cyan-950/80 border-x border-cyan-500/40"
           [style.left.%]="(targetStrain().min / 21.0) * 100"
@@ -127,7 +124,6 @@
           title="Recommended Target Band"
         ></div>
 
-        <!-- Current Strain Level Bar -->
         <div
           class="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-teal-300 rounded-full transition-all duration-700 ease-out"
           [style.width.%]="(strainScore() / 21.0) * 100"
@@ -141,6 +137,97 @@
           TARGET: {{ targetStrain().target }} ({{ targetStrain().min }} - {{ targetStrain().max }})
         </div>
         <span>21.0 MAX</span>
+      </div>
+    </section>
+
+    <!-- LIVE ANDROID STEP TELEMETRY BLOCK -->
+    <section class="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800/90 shadow-md">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <div
+            class="w-2 h-2 rounded-full"
+            [ngClass]="pedometer.isTracking() ? 'bg-emerald-400 animate-ping' : 'bg-slate-600'"
+          ></div>
+          <span class="text-[11px] font-mono uppercase tracking-wider font-semibold text-slate-300">
+            ANDROID STEPS // SENSOR STREAM
+          </span>
+        </div>
+
+        <span
+          class="text-[9px] font-mono px-2 py-0.5 rounded-full border"
+          [ngClass]="pedometer.isTracking() ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-slate-800/50 border-slate-700 text-slate-400'"
+        >
+          {{ pedometer.isTracking() ? pedometer.activeEngine() : 'OFFLINE' }}
+        </span>
+      </div>
+
+      <!-- Step Counter & Progress -->
+      <div class="flex items-baseline justify-between my-2">
+        <div>
+          <span class="text-4xl font-mono font-bold tracking-tight text-slate-100">
+            {{ liveSteps() | number }}
+          </span>
+          <span class="text-xs font-mono text-slate-400 ml-1.5">/ {{ stepGoal | number }} STEPS</span>
+        </div>
+        <div class="text-right">
+          <span class="text-sm font-mono font-bold text-emerald-400">{{ stepProgressPercent() }}%</span>
+        </div>
+      </div>
+
+      <!-- Step Goal Progress Bar -->
+      <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden my-2">
+        <div
+          class="h-full bg-gradient-to-r from-emerald-500 to-teal-300 rounded-full transition-all duration-500 ease-out"
+          [style.width.%]="stepProgressPercent()"
+        ></div>
+      </div>
+
+      <!-- Cadence, Distance & Calorie Telemetry -->
+      <div class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-800/60 font-mono text-center">
+        <div>
+          <div class="text-[9px] text-slate-500 uppercase">CADENCE</div>
+          <div class="text-xs font-semibold text-slate-200 mt-0.5">
+            {{ pedometer.activeCadence() }} <span class="text-[9px] text-slate-500 font-normal">spm</span>
+          </div>
+        </div>
+        <div class="border-x border-slate-800/60">
+          <div class="text-[9px] text-slate-500 uppercase">DISTANCE</div>
+          <div class="text-xs font-semibold text-slate-200 mt-0.5">
+            {{ estimatedDistanceKm() }} <span class="text-[9px] text-slate-500 font-normal">km</span>
+          </div>
+        </div>
+        <div>
+          <div class="text-[9px] text-slate-500 uppercase">ACTIVE BURN</div>
+          <div class="text-xs font-semibold text-slate-200 mt-0.5">
+            {{ estimatedActiveCalories() }} <span class="text-[9px] text-slate-500 font-normal">kcal</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sensor Control Buttons -->
+      <div class="flex gap-2 mt-4">
+        <button
+          type="button"
+          (click)="togglePhoneSteps()"
+          class="flex-1 py-2 px-3 rounded-xl font-mono text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
+          [ngClass]="pedometer.isTracking() ? 'bg-rose-500/10 border border-rose-500/30 text-rose-300 hover:bg-rose-500/20' : 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30'"
+        >
+          <span>{{ pedometer.isTracking() ? '■ PAUSE STEP SENSOR' : '▶ CONNECT ANDROID STEPS' }}</span>
+        </button>
+
+        <button
+          type="button"
+          (click)="simulateTestSteps()"
+          class="py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 font-mono text-[11px] text-slate-300 transition-colors"
+          title="Simulate 25 walking strides for test verification"
+        >
+          +25 TEST
+        </button>
+      </div>
+
+      <!-- Sensor Status Micro-Feed -->
+      <div class="mt-2.5 text-[10px] font-mono text-slate-500 text-center truncate">
+        {{ pedometer.statusMessage() }}
       </div>
     </section>
 
@@ -231,7 +318,6 @@
       </p>
 
       <div class="grid grid-cols-2 gap-2.5">
-        <!-- Habit 1: Drank Alcohol -->
         <button
           type="button"
           (click)="toggleHabit('drankAlcohol')"
@@ -247,7 +333,6 @@
           </div>
         </button>
 
-        <!-- Habit 2: Late Meal -->
         <button
           type="button"
           (click)="toggleHabit('lateMeal')"
@@ -263,7 +348,6 @@
           </div>
         </button>
 
-        <!-- Habit 3: Sunlight -->
         <button
           type="button"
           (click)="toggleHabit('viewedSunlight')"
@@ -279,7 +363,6 @@
           </div>
         </button>
 
-        <!-- Habit 4: Caffeine Post 2PM -->
         <button
           type="button"
           (click)="toggleHabit('caffeineAfter2PM')"
@@ -306,7 +389,6 @@
 
       <div class="grid grid-cols-7 gap-1.5 h-24 items-end pt-2">
         <div *ngFor="let item of recentLogs()" class="flex flex-col items-center gap-1.5 h-full justify-end group">
-          <!-- Recovery Bar with Height % -->
           <div
             class="w-full rounded-sm transition-all duration-300 relative"
             [ngClass]="item.scores.calculatedRecovery > 66 ? 'bg-emerald-400' : item.scores.calculatedRecovery >= 34 ? 'bg-amber-400' : 'bg-rose-500'"
