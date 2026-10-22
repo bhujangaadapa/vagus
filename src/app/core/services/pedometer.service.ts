@@ -3,7 +3,11 @@ import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { CapacitorPedometer, Measurement } from '@capgo/capacitor-pedometer';
 import { DataBridgeService } from './data-bridge.service';
 
-export type SensorEngine = 'NATIVE_PEDOMETER' | 'ANDROID_ACCELEROMETER' | 'SIMULATED';
+export type SensorEngine =
+  | 'IOS_CORE_MOTION'
+  | 'ANDROID_HARDWARE_PEDOMETER'
+  | 'MOBILE_ACCELEROMETER'
+  | 'STANDBY';
 
 @Injectable({
   providedIn: 'root',
@@ -15,13 +19,19 @@ export class PedometerService {
   public readonly isTracking = signal<boolean>(false);
   public readonly currentSteps = signal<number>(0);
   public readonly activeCadence = signal<number>(0); // steps per minute
-  public readonly activeEngine = signal<SensorEngine>('ANDROID_ACCELEROMETER');
-  public readonly statusMessage = signal<string>('Sensor standby. Tap to connect Android steps.');
+  public readonly activeEngine = signal<SensorEngine>('STANDBY');
+  public readonly platformLabel = signal<string>('Detecting OS...');
+  public readonly statusMessage = signal<string>('Auto-syncing background steps...');
+  public readonly permissionState = signal<'GRANTED' | 'PROMPT' | 'DENIED'>('PROMPT');
 
-  // Motion analysis variables for Android Accelerometer peak-detection
+  // Platform flags
+  public isIOS = false;
+  public isAndroid = false;
+
+  // Accelerometer gait filter variables
   private lastStepTimestamp = 0;
-  private readonly minStepIntervalMs = 280; // Maximum ~214 steps/min human physiological gait
-  private readonly stepAccelerationThreshold = 11.8; // Peak m/s^2 (gravity 9.8 + walking thrust 2.0)
+  private readonly minStepIntervalMs = 280; // ~214 steps/min physiological gait threshold
+  private readonly stepAccelerationThreshold = 11.6; // Peak m/s^2 (gravity 9.8 + walking impulse)
   private motionListener: ((event: DeviceMotionEvent) => void) | null = null;
   private nativeListenerHandle: PluginListenerHandle | null = null;
   private recentStepTimes: number[] = [];
@@ -29,59 +39,92 @@ export class PedometerService {
   // Active user / date context
   private currentUserId = 'pilot_athlete_01';
   private currentDateStr = new Date().toISOString().slice(0, 10);
+  private readonly storageKey = 'vagus_step_counter_state';
 
   constructor() {
+    this.detectOperatingSystem();
+    this.restorePersistedStepCount();
+
+    // Listen to today's log to reconcile counts
     this.dataBridge.todayLog$.subscribe((log) => {
       if (log && log.biometrics && typeof log.biometrics.steps === 'number') {
-        if (!this.isTracking() || this.currentSteps() === 0) {
+        if (log.biometrics.steps > this.currentSteps()) {
           this.currentSteps.set(log.biometrics.steps);
+          this.persistStepCount(log.biometrics.steps);
         }
       }
     });
+
+    // Handle app visibility change (resuming app from background on iOS / Android)
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          this.onAppForegrounded();
+        }
+      });
+    }
+
+    // Auto-start tracking on initialization like StepUp
+    this.autoStartTracking();
   }
 
   /**
-   * Primary entry point: Request permissions and start live step tracking
-   * Supports both Native Android Health Connect / Pedometer and Android Chrome Web Sensor API.
+   * Detect OS (iOS vs Android vs Web)
    */
-  public async startTracking(userId: string = 'pilot_athlete_01', dateStr?: string): Promise<boolean> {
-    this.currentUserId = userId;
-    this.currentDateStr = dateStr || new Date().toISOString().slice(0, 10);
+  private detectOperatingSystem(): void {
+    if (typeof navigator === 'undefined') return;
+
+    const ua = navigator.userAgent || '';
+    this.isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    this.isAndroid = /Android/.test(ua);
+
+    if (this.isIOS) {
+      this.platformLabel.set('Apple iOS (CoreMotion / HealthKit)');
+    } else if (this.isAndroid) {
+      this.platformLabel.set('Google Android (Health Connect / Sensor)');
+    } else {
+      this.platformLabel.set('Cross-Platform Biometric Sensor');
+    }
+  }
+
+  /**
+   * Automatically start step collection without requiring manual toggle
+   */
+  public async autoStartTracking(userId?: string, dateStr?: string): Promise<boolean> {
+    if (userId) this.currentUserId = userId;
+    if (dateStr) this.currentDateStr = dateStr;
 
     const isNative = Capacitor.isNativePlatform();
 
+    // 1. Native iOS / Android Capacitor Layer
     if (isNative) {
       try {
         const available = await CapacitorPedometer.isAvailable();
         if (available && available.stepCounting) {
-          const perm = await CapacitorPedometer.requestPermissions();
+          const perm = await CapacitorPedometer.checkPermissions();
+
           if (perm.activityRecognition === 'granted') {
-            this.nativeListenerHandle = await CapacitorPedometer.addListener(
-              'measurement',
-              (data: Measurement) => {
-                if (typeof data.numberOfSteps === 'number') {
-                  this.onStepDetected(data.numberOfSteps, true);
-                }
-              }
-            );
-            await CapacitorPedometer.startMeasurementUpdates();
-            this.activeEngine.set('NATIVE_PEDOMETER');
-            this.isTracking.set(true);
-            this.statusMessage.set('Android hardware step sensor active.');
-            return true;
+            this.permissionState.set('GRANTED');
+            return this.initializeNativePedometer();
+          } else {
+            const requested = await CapacitorPedometer.requestPermissions();
+            if (requested.activityRecognition === 'granted') {
+              this.permissionState.set('GRANTED');
+              return this.initializeNativePedometer();
+            }
           }
         }
       } catch (err) {
-        console.warn('[PedometerService] Native pedometer fallback to Web Accelerometer:', err);
+        console.warn('[PedometerService] Native pedometer check failed, checking web sensors:', err);
       }
     }
 
-    // Android Web / PWA Accelerometer Integration
-    return this.startWebMotionSensor();
+    // 2. Mobile Web / PWA Accelerometer Layer (iOS Safari & Android Chrome)
+    return this.initializeWebMotionSensor();
   }
 
   /**
-   * Stop tracking step stream
+   * Stop or pause step collection
    */
   public async stopTracking(): Promise<void> {
     if (this.motionListener && typeof window !== 'undefined') {
@@ -101,18 +144,87 @@ export class PedometerService {
 
     this.isTracking.set(false);
     this.activeCadence.set(0);
-    this.statusMessage.set('Step tracking paused.');
+    this.activeEngine.set('STANDBY');
+    this.statusMessage.set('Auto-sync paused.');
   }
 
   /**
-   * Fallback for Android Chrome PWA: Uses DeviceMotionEvent 3-axis accelerometer
+   * Native iOS CoreMotion & Android Step Counter integration
    */
-  private async startWebMotionSensor(): Promise<boolean> {
+  private async initializeNativePedometer(): Promise<boolean> {
+    try {
+      // Query steps taken today from start of day (midnight) to now
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      try {
+        const todayMeasurement = await CapacitorPedometer.getMeasurement({
+          start: startOfDay.getTime(),
+          end: Date.now(),
+        });
+
+        if (typeof todayMeasurement.numberOfSteps === 'number' && todayMeasurement.numberOfSteps > 0) {
+          this.currentSteps.set(todayMeasurement.numberOfSteps);
+          this.persistStepCount(todayMeasurement.numberOfSteps);
+          this.dataBridge.updateLiveSteps(this.currentUserId, this.currentDateStr, todayMeasurement.numberOfSteps);
+        }
+      } catch (queryErr) {
+        console.info('[PedometerService] Range measurement not supported, streaming updates directly:', queryErr);
+      }
+
+      // Listen to continuous live updates
+      this.nativeListenerHandle = await CapacitorPedometer.addListener('measurement', (data: Measurement) => {
+        if (typeof data.numberOfSteps === 'number') {
+          this.onStepDetected(data.numberOfSteps, true);
+        }
+      });
+
+      await CapacitorPedometer.startMeasurementUpdates();
+
+      const engine: SensorEngine = this.isIOS ? 'IOS_CORE_MOTION' : 'ANDROID_HARDWARE_PEDOMETER';
+      this.activeEngine.set(engine);
+      this.isTracking.set(true);
+      this.statusMessage.set(`Connected: ${this.platformLabel()}`);
+      return true;
+    } catch (err) {
+      console.warn('[PedometerService] Native setup failed, falling back to Web Accelerometer:', err);
+      return this.initializeWebMotionSensor();
+    }
+  }
+
+  /**
+   * Web Sensor API (Android Chrome & iOS Safari Motion Sensors)
+   */
+  private async initializeWebMotionSensor(): Promise<boolean> {
     if (typeof window === 'undefined' || !('DeviceMotionEvent' in window)) {
-      this.statusMessage.set('Device motion sensor not supported on this browser.');
+      this.statusMessage.set('Motion sensors unavailable on this client.');
       return false;
     }
 
+    // iOS 13+ requires user gesture permission
+    const deviceMotion = window.DeviceMotionEvent as unknown as {
+      requestPermission?: () => Promise<'granted' | 'denied'>;
+    };
+
+    if (typeof deviceMotion.requestPermission === 'function') {
+      this.permissionState.set('PROMPT');
+      this.statusMessage.set('iOS Safari: Tap "Authorize Motion" to enable automatic step sync.');
+      return false;
+    }
+
+    // Android Chrome auto-activates immediately without prompt
+    this.bindDeviceMotionListener();
+    this.permissionState.set('GRANTED');
+    this.activeEngine.set('MOBILE_ACCELEROMETER');
+    this.isTracking.set(true);
+    this.statusMessage.set(`Auto-sync active via ${this.platformLabel()}`);
+    return true;
+  }
+
+  /**
+   * Request iOS Safari DeviceMotion Permission (invoked by user tap)
+   */
+  public async requestIOSMotionPermission(): Promise<boolean> {
     const deviceMotion = window.DeviceMotionEvent as unknown as {
       requestPermission?: () => Promise<'granted' | 'denied'>;
     };
@@ -120,26 +232,36 @@ export class PedometerService {
     if (typeof deviceMotion.requestPermission === 'function') {
       try {
         const response = await deviceMotion.requestPermission();
-        if (response !== 'granted') {
-          this.statusMessage.set('Permission denied for device motion sensors.');
+        if (response === 'granted') {
+          this.permissionState.set('GRANTED');
+          this.bindDeviceMotionListener();
+          this.activeEngine.set('MOBILE_ACCELEROMETER');
+          this.isTracking.set(true);
+          this.statusMessage.set('Apple iOS motion sensor authorized & auto-syncing steps.');
+          return true;
+        } else {
+          this.permissionState.set('DENIED');
+          this.statusMessage.set('Motion access denied in iOS Settings.');
           return false;
         }
-      } catch (e) {
-        console.warn('[PedometerService] Sensor permission error:', e);
+      } catch (err) {
+        console.warn('[PedometerService] iOS permission request error:', err);
+        return false;
       }
     }
+    return false;
+  }
 
+  private bindDeviceMotionListener(): void {
+    if (this.motionListener) {
+      window.removeEventListener('devicemotion', this.motionListener);
+    }
     this.motionListener = (event: DeviceMotionEvent) => this.handleDeviceMotion(event);
     window.addEventListener('devicemotion', this.motionListener, { passive: true });
-
-    this.activeEngine.set('ANDROID_ACCELEROMETER');
-    this.isTracking.set(true);
-    this.statusMessage.set('Android 3-axis accelerometer connected & tracking steps.');
-    return true;
   }
 
   /**
-   * Accelerometer Signal Processing & Peak Detection
+   * High-accuracy peak detection algorithm
    */
   private handleDeviceMotion(event: DeviceMotionEvent): void {
     const acc = event.accelerationIncludingGravity || event.acceleration;
@@ -165,14 +287,59 @@ export class PedometerService {
   private onStepDetected(deltaOrTotal: number, isAbsoluteTotal: boolean): void {
     const newTotal = isAbsoluteTotal ? deltaOrTotal : this.currentSteps() + deltaOrTotal;
     this.currentSteps.set(newTotal);
+    this.persistStepCount(newTotal);
 
+    // Calculate Cadence (steps/minute over sliding 5-second window)
     const now = performance.now();
     this.recentStepTimes.push(now);
     this.recentStepTimes = this.recentStepTimes.filter((t) => now - t <= 5000);
     const cadence = Math.round((this.recentStepTimes.length / 5) * 60);
     this.activeCadence.set(cadence);
 
+    // Sync to Firestore
     this.dataBridge.updateLiveSteps(this.currentUserId, this.currentDateStr, newTotal);
+  }
+
+  private async onAppForegrounded(): Promise<void> {
+    // Re-check native measurement on app wake
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const measurement = await CapacitorPedometer.getMeasurement({
+          start: startOfDay.getTime(),
+          end: Date.now(),
+        });
+        if (typeof measurement.numberOfSteps === 'number' && measurement.numberOfSteps > this.currentSteps()) {
+          this.onStepDetected(measurement.numberOfSteps, true);
+        }
+      } catch {}
+    }
+  }
+
+  private persistStepCount(steps: number): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const data = {
+        date: this.currentDateStr,
+        steps,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(this.storageKey, JSON.stringify(data));
+    } catch {}
+  }
+
+  private restorePersistedStepCount(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(this.storageKey);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data.date === this.currentDateStr && typeof data.steps === 'number') {
+          this.currentSteps.set(data.steps);
+        }
+      }
+    } catch {}
   }
 
   public simulateStride(count: number = 10): void {

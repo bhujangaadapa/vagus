@@ -132,8 +132,12 @@ export class DashboardComponent implements OnInit {
       await this.pedometer.stopTracking();
     } else {
       const today = this.todayLog()?.date;
-      await this.pedometer.startTracking(this.activeUserId(), today);
+      await this.pedometer.autoStartTracking(this.activeUserId(), today);
     }
+  }
+
+  public async authorizeIOSMotion(): Promise<void> {
+    await this.pedometer.requestIOSMotionPermission();
   }
 
   public simulateTestSteps(): void {
@@ -143,7 +147,7 @@ export class DashboardComponent implements OnInit {
   public async requestPermissions(): Promise<void> {
     const result = await this.dataBridge.requestHealthPermissions();
     this.permissionGranted.set(result.success);
-    await this.pedometer.startTracking(this.activeUserId(), this.todayLog()?.date);
+    await this.pedometer.autoStartTracking(this.activeUserId(), this.todayLog()?.date);
   }
 
   public async seedInitialData(): Promise<void> {

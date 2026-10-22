@@ -210,7 +210,7 @@
       </div>
     </section>
 
-    <!-- LIVE ANDROID STEP TELEMETRY BLOCK -->
+    <!-- LIVE DUAL-OS STEP TELEMETRY BLOCK (AUTOMATIC IOS & ANDROID) -->
     <section class="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800/90 shadow-md">
       <div class="flex items-center justify-between mb-3">
         <div class="flex items-center gap-2">
@@ -219,7 +219,7 @@
             [ngClass]="pedometer.isTracking() ? 'bg-emerald-400 animate-ping' : 'bg-slate-600'"
           ></div>
           <span class="text-[11px] font-mono uppercase tracking-wider font-semibold text-slate-300">
-            ANDROID STEPS // SENSOR STREAM
+            AUTO STEPS // IOS & ANDROID
           </span>
         </div>
 
@@ -227,8 +227,25 @@
           class="text-[9px] font-mono px-2 py-0.5 rounded-full border"
           [ngClass]="pedometer.isTracking() ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-slate-800/50 border-slate-700 text-slate-400'"
         >
-          {{ pedometer.isTracking() ? pedometer.activeEngine() : 'OFFLINE' }}
+          {{ pedometer.activeEngine() }}
         </span>
+      </div>
+
+      <!-- iOS Safari Motion Access Authorization Banner if needed -->
+      <div
+        *ngIf="pedometer.isIOS && pedometer.permissionState() === 'PROMPT'"
+        class="mb-3 p-3 rounded-xl bg-cyan-950/40 border border-cyan-800/50 flex items-center justify-between"
+      >
+        <div class="text-[11px] font-mono text-cyan-200">
+          Authorize Apple CoreMotion for automatic background step tracking
+        </div>
+        <button
+          type="button"
+          (click)="authorizeIOSMotion()"
+          class="ml-2 px-2.5 py-1 rounded bg-cyan-500 text-slate-950 font-mono text-[10px] font-bold uppercase hover:bg-cyan-400 transition-colors shrink-0"
+        >
+          AUTHORIZE
+        </button>
       </div>
 
       <div class="flex items-baseline justify-between my-2">
@@ -276,9 +293,9 @@
           type="button"
           (click)="togglePhoneSteps()"
           class="flex-1 py-2 px-3 rounded-xl font-mono text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
-          [ngClass]="pedometer.isTracking() ? 'bg-rose-500/10 border border-rose-500/30 text-rose-300 hover:bg-rose-500/20' : 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30'"
+          [ngClass]="pedometer.isTracking() ? 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200' : 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30'"
         >
-          <span>{{ pedometer.isTracking() ? '■ PAUSE STEP SENSOR' : '▶ CONNECT ANDROID STEPS' }}</span>
+          <span>{{ pedometer.isTracking() ? '● AUTO-SYNC ACTIVE (TAP TO PAUSE)' : '▶ RESUME AUTO-SYNC' }}</span>
         </button>
 
         <button
