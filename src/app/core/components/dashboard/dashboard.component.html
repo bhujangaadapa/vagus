@@ -1024,13 +1024,33 @@
             </button>
           </div>
 
+          <!-- Sport Activity Selector (Volleyball, Walking, Strength, Running, etc.) -->
+          <div class="space-y-1.5 pt-1">
+            <div class="text-[10px] text-zinc-400 font-bold uppercase tracking-wider flex justify-between">
+              <span>SELECT SPORT / ACTIVITY</span>
+              <span class="text-cyan-400 font-bold">{{ bleHR.selectedSport().icon }} {{ bleHR.selectedSport().name }}</span>
+            </div>
+            <div class="flex gap-2 overflow-x-auto pb-1.5 scrollbar-thin scrollbar-thumb-white/10">
+              <button
+                *ngFor="let s of bleHR.availableSports"
+                type="button"
+                (click)="selectWorkoutSport(s)"
+                class="px-3 py-2 rounded-xl text-xs font-mono font-bold whitespace-nowrap transition-all border flex items-center gap-1.5 cursor-pointer shrink-0"
+                [ngClass]="bleHR.selectedSport().id === s.id ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-[0_0_10px_rgba(0,240,255,0.2)]' : 'bg-black/40 text-zinc-400 border-white/[0.05] hover:border-white/20'"
+              >
+                <span>{{ s.icon }}</span>
+                <span>{{ s.name }}</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Start Workout Button -->
           <button
             type="button"
             (click)="toggleWorkoutTracker()"
             class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 via-teal-400 to-[#00F5A0] hover:brightness-110 text-slate-950 font-bold uppercase tracking-wider text-xs transition-all shadow-[0_0_15px_rgba(0,240,255,0.2)] active:scale-[0.99] cursor-pointer"
           >
-            START LIVE WORKOUT SESSION
+            START {{ bleHR.selectedSport().icon }} {{ bleHR.selectedSport().name | uppercase }} SESSION
           </button>
 
           <!-- Athlete Zone Thresholds Reference Card -->
@@ -1063,6 +1083,60 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <!-- TODAY'S RECORDED ACTIVITIES & SPORTS HISTORY -->
+      <section class="whoop-surface p-5 rounded-3xl space-y-3 font-mono">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-2.5 h-2.5 rounded-full bg-cyan-400"></div>
+            <span class="text-xs font-bold text-white uppercase tracking-wider">TODAY'S RECORDED SPORTS</span>
+          </div>
+          <button
+            type="button"
+            (click)="openManualLogModal()"
+            class="px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-cyan-300 border border-cyan-500/30 text-[10px] font-bold uppercase transition-colors cursor-pointer"
+          >
+            + LOG PAST SPORT
+          </button>
+        </div>
+
+        <!-- Recorded Activities List -->
+        <div *ngIf="todayLog()?.activities && todayLog()!.activities!.length > 0; else noActivities" class="space-y-2">
+          <div
+            *ngFor="let act of todayLog()!.activities"
+            class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.05] space-y-2"
+          >
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <span class="text-2xl">{{ act.sportIcon }}</span>
+                <div>
+                  <div class="text-xs font-bold text-white">{{ act.sportName }}</div>
+                  <div class="text-[10px] text-zinc-500">{{ formatZoneDuration(act.durationSeconds) }} duration &bull; avg {{ act.avgBpm }} bpm</div>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-xs font-bold text-cyan-400">+{{ act.strain }} STRAIN</span>
+                <div class="text-[10px] text-zinc-400">{{ act.caloriesBurned }} kcal</div>
+              </div>
+            </div>
+
+            <!-- Vagal recovery badge if present -->
+            <div *ngIf="act.vagalRecoveryDropBpm" class="pt-1.5 border-t border-white/[0.04] flex items-center justify-between text-[10px]">
+              <span class="text-zinc-500 uppercase tracking-wider">60s VAGAL RECOVERY:</span>
+              <span class="text-[#00F5A0] font-bold">-{{ act.vagalRecoveryDropBpm }} bpm drop ({{ act.vagalToneGrade }})</span>
+            </div>
+          </div>
+        </div>
+
+        <ng-template #noActivities>
+          <div class="p-4 rounded-2xl bg-black/30 border border-white/[0.03] text-center space-y-1">
+            <div class="text-xs text-zinc-400 font-bold">No sports logged today yet.</div>
+            <div class="text-[10px] text-zinc-500 font-sans">
+              Play volleyball, go walking, or lift weights with Polar H7 above, or tap "+ Log Past Sport".
+            </div>
+          </div>
+        </ng-template>
       </section>
 
       <!-- Footsteps & Movement Telemetry (Direct Phone Hardware Sensor) -->
@@ -1912,6 +1986,122 @@
             CANCEL
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MANUAL WORKOUT ACTIVITY MODAL -->
+  <div
+    *ngIf="showManualLogModal()"
+    class="fixed inset-0 z-50 bg-[#06070a]/90 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto font-mono text-xs animate-fade-in"
+  >
+    <div class="whoop-surface-elevated max-w-sm w-full p-6 rounded-3xl border border-cyan-500/30 space-y-4 relative bg-[#06070a] shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#00F0FF]"></span>
+          <span class="text-sm font-bold text-white uppercase tracking-wider">LOG PAST SPORT</span>
+        </div>
+        <button
+          type="button"
+          (click)="closeManualLogModal()"
+          class="text-zinc-400 hover:text-white px-2 py-1 rounded-lg bg-white/[0.06] cursor-pointer"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Sport Picker Grid -->
+      <div class="space-y-1.5">
+        <label class="text-[10px] uppercase text-zinc-400 font-bold">SELECT SPORT / ACTIVITY</label>
+        <div class="grid grid-cols-3 gap-1.5 max-h-44 overflow-y-auto pr-1">
+          <button
+            *ngFor="let s of bleHR.availableSports"
+            type="button"
+            (click)="setManualSport(s)"
+            class="p-2 rounded-xl border text-left transition-all cursor-pointer"
+            [ngClass]="manualSport().id === s.id ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-[0_0_8px_rgba(0,240,255,0.2)]' : 'bg-black/40 text-zinc-400 border-white/[0.05] hover:border-white/20'"
+          >
+            <div class="text-lg">{{ s.icon }}</div>
+            <div class="text-[10px] font-bold truncate mt-0.5">{{ s.name }}</div>
+            <div class="text-[8px] text-zinc-500">{{ s.met }} MET</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Duration Selection -->
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between text-[10px] uppercase text-zinc-400 font-bold">
+          <span>DURATION</span>
+          <span class="text-cyan-400 font-bold">{{ manualDurationMinutes() }} MINUTES</span>
+        </div>
+        <div class="grid grid-cols-5 gap-1 text-[11px]">
+          <button
+            *ngFor="let d of [15, 30, 45, 60, 90]"
+            type="button"
+            (click)="setManualDuration(d)"
+            class="py-2 rounded-xl border text-center font-bold cursor-pointer transition-colors"
+            [ngClass]="manualDurationMinutes() === d ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-black' : 'bg-black/40 text-zinc-400 border-white/[0.05] hover:border-white/20'"
+          >
+            {{ d }}m
+          </button>
+        </div>
+      </div>
+
+      <!-- Effort / Intensity -->
+      <div class="space-y-1.5">
+        <label class="text-[10px] uppercase text-zinc-400 font-bold">PERCEIVED EXERTION</label>
+        <div class="grid grid-cols-4 gap-1 text-[9px] font-mono">
+          <button
+            type="button"
+            (click)="setManualEffort('LIGHT')"
+            class="py-2 rounded-xl border text-center font-bold cursor-pointer transition-colors"
+            [ngClass]="manualEffort() === 'LIGHT' ? 'bg-blue-500 text-white border-blue-400' : 'bg-black/40 text-zinc-400 border-white/[0.05]'"
+          >
+            LIGHT
+          </button>
+          <button
+            type="button"
+            (click)="setManualEffort('MODERATE')"
+            class="py-2 rounded-xl border text-center font-bold cursor-pointer transition-colors"
+            [ngClass]="manualEffort() === 'MODERATE' ? 'bg-[#00F5A0] text-slate-950 border-[#00F5A0]' : 'bg-black/40 text-zinc-400 border-white/[0.05]'"
+          >
+            MODERATE
+          </button>
+          <button
+            type="button"
+            (click)="setManualEffort('HARD')"
+            class="py-2 rounded-xl border text-center font-bold cursor-pointer transition-colors"
+            [ngClass]="manualEffort() === 'HARD' ? 'bg-orange-500 text-white border-orange-400' : 'bg-black/40 text-zinc-400 border-white/[0.05]'"
+          >
+            HARD
+          </button>
+          <button
+            type="button"
+            (click)="setManualEffort('ALL_OUT')"
+            class="py-2 rounded-xl border text-center font-bold cursor-pointer transition-colors"
+            [ngClass]="manualEffort() === 'ALL_OUT' ? 'bg-rose-500 text-white border-rose-400' : 'bg-black/40 text-zinc-400 border-white/[0.05]'"
+          >
+            ALL-OUT
+          </button>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="space-y-2 pt-2">
+        <button
+          type="button"
+          (click)="logManualWorkout()"
+          class="w-full py-3 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold uppercase tracking-wider text-xs transition-all shadow-[0_0_15px_rgba(0,240,255,0.25)] cursor-pointer"
+        >
+          LOG {{ manualSport().icon }} {{ manualSport().name | uppercase }} TO TODAY
+        </button>
+        <button
+          type="button"
+          (click)="closeManualLogModal()"
+          class="w-full py-2 text-center text-zinc-500 hover:text-white text-xs uppercase cursor-pointer"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   </div>

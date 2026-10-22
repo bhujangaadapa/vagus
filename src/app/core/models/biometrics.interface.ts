@@ -32,6 +32,21 @@ export interface AdvancedKPIs {
   sleepEfficiencyCoefficient: number;  // ((deep + rem) / totalBed) * (RHR / avgSleepHR)
 }
 
+export interface RecordedWorkoutActivity {
+  id: string;
+  sport: string;           // 'volleyball' | 'walking' | 'strength' | 'running' | ...
+  sportName: string;       // e.g. 'Volleyball', 'Walking', 'Strength Training'
+  sportIcon: string;       // e.g. '🏐', '🚶', '🏋️'
+  durationSeconds: number; // e.g. 2400 (40 mins)
+  avgBpm: number;
+  maxBpm: number;
+  strain: number;          // Banister TRIMP accumulated
+  caloriesBurned: number;
+  vagalRecoveryDropBpm?: number;
+  vagalToneGrade?: string;
+  timestamp: string;       // ISO 8601
+}
+
 /**
  * Canonical Firestore Daily Log Document
  * Located at: users/{userId}/daily_logs/YYYY-MM-DD
@@ -42,6 +57,7 @@ export interface DailyBiometricLog {
   journalHabits: JournalHabits;
   scores: DailyScores;
   advancedKPIs: AdvancedKPIs;
+  activities?: RecordedWorkoutActivity[]; // List of recorded workouts / sports today
   updatedAt?: string;          // ISO 8601 timestamp of last calculation
 }
 

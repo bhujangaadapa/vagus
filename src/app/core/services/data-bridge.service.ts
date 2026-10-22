@@ -22,6 +22,7 @@ import {
   AdvancedKPIs,
   UserPhysiologyBaseline,
   RollingDayMetric,
+  RecordedWorkoutActivity,
 } from '../models/biometrics.interface';
 import { PhysicsEngineService } from './physics-engine.service';
 
@@ -614,7 +615,8 @@ export class DataBridgeService {
    */
   public async accumulateWorkoutStrain(
     workoutStrain: number,
-    userId?: string
+    userId?: string,
+    activity?: RecordedWorkoutActivity
   ): Promise<DailyBiometricLog | null> {
     const targetUid = userId || this.activeUserId;
     const todayStr = this.getFormattedDate(new Date());
@@ -646,6 +648,11 @@ export class DataBridgeService {
 
     baseLog.scores.calculatedStrain = finalStrain;
     baseLog.updatedAt = new Date().toISOString();
+
+    // Append to recorded activities list if provided
+    if (activity) {
+      baseLog.activities = [...(baseLog.activities || []), activity];
+    }
 
     // Recalculate 7-day fatigue drag
     const historyLogs = currentList.filter((l) => l.date !== todayStr);

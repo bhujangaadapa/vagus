@@ -1,6 +1,30 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { PhysicsEngineService } from './physics-engine.service';
 import { DataBridgeService } from './data-bridge.service';
+import { RecordedWorkoutActivity } from '../models/biometrics.interface';
+
+export interface SportActivityDef {
+  id: string;
+  name: string;
+  icon: string;
+  met: number;
+  category: 'team' | 'strength' | 'cardio' | 'recovery';
+}
+
+export const AVAILABLE_SPORTS: SportActivityDef[] = [
+  { id: 'volleyball', name: 'Volleyball', icon: '🏐', met: 6.0, category: 'team' },
+  { id: 'walking', name: 'Walking', icon: '🚶', met: 3.5, category: 'cardio' },
+  { id: 'strength', name: 'Strength Training', icon: '🏋️', met: 5.0, category: 'strength' },
+  { id: 'running', name: 'Running', icon: '🏃', met: 9.0, category: 'cardio' },
+  { id: 'cycling', name: 'Cycling', icon: '🚴', met: 7.5, category: 'cardio' },
+  { id: 'hiit', name: 'HIIT / Circuit', icon: '🔥', met: 8.5, category: 'cardio' },
+  { id: 'tennis', name: 'Tennis / Pickleball', icon: '🎾', met: 7.0, category: 'team' },
+  { id: 'basketball', name: 'Basketball', icon: '🏀', met: 8.0, category: 'team' },
+  { id: 'badminton', name: 'Badminton', icon: '🏸', met: 6.5, category: 'team' },
+  { id: 'yoga', name: 'Yoga & Mobility', icon: '🧘', met: 2.5, category: 'recovery' },
+  { id: 'swimming', name: 'Swimming', icon: '🏊', met: 8.0, category: 'cardio' },
+  { id: 'boxing', name: 'Boxing / MMA', icon: '🥊', met: 9.5, category: 'cardio' },
+];
 
 export interface BleScanSession {
   isActive: boolean;
@@ -30,10 +54,12 @@ export interface BleVagalRecoveryTest {
 }
 
 export interface BleCompletedWorkoutSummary {
+  sport: SportActivityDef;
   durationSeconds: number;
   avgBpm: number;
   maxBpm: number;
   accumulatedStrain: number;
+  caloriesBurned: number;
   zoneSeconds: {
     z1: number;
     z2: number;
@@ -49,11 +75,13 @@ export interface BleCompletedWorkoutSummary {
 
 export interface BleWorkoutSession {
   isActive: boolean;
+  sport: SportActivityDef;
   elapsedSeconds: number;
   currentBpm: number;
   maxBpm: number;
   avgBpm: number;
   accumulatedStrain: number;
+  caloriesBurned: number;
   bpmSamples: number[];
   currentZone: 1 | 2 | 3 | 4 | 5;
   zoneSeconds: {
@@ -156,14 +184,24 @@ export class BleHeartRateService {
     }
   }
 
+  // Sport Activities Library
+  public readonly availableSports = AVAILABLE_SPORTS;
+  public readonly selectedSport = signal<SportActivityDef>(AVAILABLE_SPORTS[0]);
+
+  public setSelectedSport(sport: SportActivityDef): void {
+    this.selectedSport.set(sport);
+  }
+
   // Live Workout Strain session (Digifit-style Zones + Vagal Recovery)
   public readonly workoutSession = signal<BleWorkoutSession>({
     isActive: false,
+    sport: AVAILABLE_SPORTS[0],
     elapsedSeconds: 0,
     currentBpm: 0,
     maxBpm: 0,
     avgBpm: 0,
     accumulatedStrain: 0,
+    caloriesBurned: 0,
     bpmSamples: [],
     currentZone: 1,
     zoneSeconds: { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0 },
@@ -452,9 +490,9 @@ export class BleHeartRateService {
   }
 
   /**
-   * Start Live Workout Strain Tracking (Digifit-style Zones + Telemetry)
+   * Start Live Workout Strain Tracking (Digifit-style Zones + Telemetry + Sport Activity)
    */
-  public startWorkout(): void {
+  public startWorkout(sport?: SportActivityDef): void {
     if (!this.isConnected()) return;
 
     if (this.workoutTimerInterval) {
@@ -466,16 +504,21 @@ export class BleHeartRateService {
       this.recoveryTimerInterval = null;
     }
 
+    const chosenSport = sport || this.selectedSport();
+    this.selectedSport.set(chosenSport);
+
     const initBpm = this.liveBpm() || 70;
     const initZone = this.calculateZone(initBpm);
 
     this.workoutSession.set({
       isActive: true,
+      sport: chosenSport,
       elapsedSeconds: 0,
       currentBpm: initBpm,
       maxBpm: initBpm,
       avgBpm: initBpm,
       accumulatedStrain: 0,
+      caloriesBurned: 0,
       bpmSamples: [initBpm],
       currentZone: initZone,
       zoneSeconds: { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0 },
@@ -525,14 +568,17 @@ export class BleHeartRateService {
         }
       }
 
-      // Every 5 seconds, compute TRIMP strain increment
+      // Every 5 seconds, compute TRIMP strain & active calories
       let strain = current.accumulatedStrain;
+      let calories = current.caloriesBurned;
       if (nextElapsed % 5 === 0 && current.bpmSamples.length > 0) {
         strain = this.physicsEngine.calculateAccumulatedStrain(
           current.bpmSamples,
           50,
           this.athleteMaxHr()
         );
+        const durationMins = nextElapsed / 60;
+        calories = Math.round(current.sport.met * 75 * (durationMins / 60));
       }
 
       this.workoutSession.set({
@@ -543,6 +589,7 @@ export class BleHeartRateService {
         zoneSeconds: nextZones,
         timeline: nextTimeline,
         accumulatedStrain: strain,
+        caloriesBurned: calories,
       });
     }, 1000);
   }
@@ -641,11 +688,32 @@ export class BleHeartRateService {
       this.athleteMaxHr()
     );
 
+    const sport = cur.sport || this.selectedSport();
+    const durationMins = Math.max(1, Math.round(cur.elapsedSeconds / 60));
+    const calories = Math.round(sport.met * 75 * (durationMins / 60));
+
+    const activity: RecordedWorkoutActivity = {
+      id: 'workout_' + Date.now(),
+      sport: sport.id,
+      sportName: sport.name,
+      sportIcon: sport.icon,
+      durationSeconds: cur.elapsedSeconds,
+      avgBpm: cur.avgBpm,
+      maxBpm: cur.maxBpm,
+      strain: finalStrain,
+      caloriesBurned: calories,
+      vagalRecoveryDropBpm: drop,
+      vagalToneGrade: grade,
+      timestamp: new Date().toISOString(),
+    };
+
     const summary: BleCompletedWorkoutSummary = {
+      sport,
       durationSeconds: cur.elapsedSeconds,
       avgBpm: cur.avgBpm,
       maxBpm: cur.maxBpm,
       accumulatedStrain: finalStrain,
+      caloriesBurned: calories,
       zoneSeconds: { ...cur.zoneSeconds },
       timeline: [...cur.timeline],
       recoveryDropBpm: drop,
@@ -666,7 +734,7 @@ export class BleHeartRateService {
       lastSummary: summary,
     });
 
-    await this.dataBridge.accumulateWorkoutStrain(finalStrain);
+    await this.dataBridge.accumulateWorkoutStrain(finalStrain, this.activeUserId, activity);
   }
 
   /**
@@ -689,11 +757,30 @@ export class BleHeartRateService {
       this.athleteMaxHr()
     );
 
+    const sport = session.sport || this.selectedSport();
+    const durationMins = Math.max(1, Math.round(session.elapsedSeconds / 60));
+    const calories = Math.round(sport.met * 75 * (durationMins / 60));
+
+    const activity: RecordedWorkoutActivity = {
+      id: 'workout_' + Date.now(),
+      sport: sport.id,
+      sportName: sport.name,
+      sportIcon: sport.icon,
+      durationSeconds: session.elapsedSeconds,
+      avgBpm: session.avgBpm,
+      maxBpm: session.maxBpm,
+      strain: finalStrain,
+      caloriesBurned: calories,
+      timestamp: new Date().toISOString(),
+    };
+
     const summary: BleCompletedWorkoutSummary = {
+      sport,
       durationSeconds: session.elapsedSeconds,
       avgBpm: session.avgBpm,
       maxBpm: session.maxBpm,
       accumulatedStrain: finalStrain,
+      caloriesBurned: calories,
       zoneSeconds: { ...session.zoneSeconds },
       timeline: [...session.timeline],
       completedAt: new Date(),
@@ -706,7 +793,7 @@ export class BleHeartRateService {
     });
 
     if (saveStrain && finalStrain > 0) {
-      await this.dataBridge.accumulateWorkoutStrain(finalStrain);
+      await this.dataBridge.accumulateWorkoutStrain(finalStrain, this.activeUserId, activity);
     }
     return finalStrain;
   }

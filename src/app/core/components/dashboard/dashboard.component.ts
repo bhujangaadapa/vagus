@@ -5,10 +5,10 @@ import { AuthService } from '../../services/auth.service';
 import { DataBridgeService } from '../../services/data-bridge.service';
 import { PhysicsEngineService } from '../../services/physics-engine.service';
 import { PedometerService } from '../../services/pedometer.service';
-import { BleHeartRateService, BleWorkoutTimelinePoint } from '../../services/ble-heart-rate.service';
+import { BleHeartRateService, BleWorkoutTimelinePoint, SportActivityDef, AVAILABLE_SPORTS } from '../../services/ble-heart-rate.service';
 import { CameraPpgService } from '../../services/camera-ppg.service';
 import { XiaomiIntegrationService } from '../../services/xiaomi-integration.service';
-import { DailyBiometricLog, JournalHabits } from '../../models/biometrics.interface';
+import { DailyBiometricLog, JournalHabits, RecordedWorkoutActivity } from '../../models/biometrics.interface';
 
 @Component({
   selector: 'app-dashboard',
@@ -373,6 +373,83 @@ export class DashboardComponent implements OnInit {
 
   public dismissWorkoutSummary(): void {
     this.bleHR.dismissWorkoutSummary();
+  }
+
+  public selectWorkoutSport(sport: SportActivityDef): void {
+    this.bleHR.setSelectedSport(sport);
+  }
+
+  // Manual Activity Logger Modal State
+  public readonly showManualLogModal = signal<boolean>(false);
+  public readonly manualSport = signal<SportActivityDef>(AVAILABLE_SPORTS[0]);
+  public readonly manualDurationMinutes = signal<number>(45);
+  public readonly manualEffort = signal<'LIGHT' | 'MODERATE' | 'HARD' | 'ALL_OUT'>('MODERATE');
+
+  public openManualLogModal(sport?: SportActivityDef): void {
+    if (sport) {
+      this.manualSport.set(sport);
+    }
+    this.showManualLogModal.set(true);
+  }
+
+  public closeManualLogModal(): void {
+    this.showManualLogModal.set(false);
+  }
+
+  public setManualSport(sport: SportActivityDef): void {
+    this.manualSport.set(sport);
+  }
+
+  public setManualDuration(minutes: number): void {
+    this.manualDurationMinutes.set(Math.max(5, Math.min(360, minutes)));
+  }
+
+  public setManualEffort(effort: 'LIGHT' | 'MODERATE' | 'HARD' | 'ALL_OUT'): void {
+    this.manualEffort.set(effort);
+  }
+
+  public async logManualWorkout(): Promise<void> {
+    const sport = this.manualSport();
+    const duration = this.manualDurationMinutes();
+    const effort = this.manualEffort();
+
+    let estAvgBpm = 125;
+    let baseStrain = 6.5;
+    if (effort === 'LIGHT') {
+      estAvgBpm = 105;
+      baseStrain = 4.0;
+    } else if (effort === 'MODERATE') {
+      estAvgBpm = 130;
+      baseStrain = 7.5;
+    } else if (effort === 'HARD') {
+      estAvgBpm = 155;
+      baseStrain = 12.0;
+    } else if (effort === 'ALL_OUT') {
+      estAvgBpm = 175;
+      baseStrain = 16.5;
+    }
+
+    const durationFactor = Math.pow(duration / 45, 0.7);
+    const finalStrain = Math.round(Math.min(20.5, baseStrain * durationFactor) * 10) / 10;
+
+    const weight = this.athleteDemographics().weightKg || 75;
+    const calories = Math.round(sport.met * weight * (duration / 60));
+
+    const activity: RecordedWorkoutActivity = {
+      id: 'manual_' + Date.now(),
+      sport: sport.id,
+      sportName: sport.name,
+      sportIcon: sport.icon,
+      durationSeconds: duration * 60,
+      avgBpm: estAvgBpm,
+      maxBpm: Math.min(195, estAvgBpm + 25),
+      strain: finalStrain,
+      caloriesBurned: calories,
+      timestamp: new Date().toISOString(),
+    };
+
+    await this.dataBridge.accumulateWorkoutStrain(finalStrain, this.activeUserId(), activity);
+    this.showManualLogModal.set(false);
   }
 
   // Digifit Zone Ranges computed from athlete's calibrated max HR
