@@ -1,1060 +1,1209 @@
-<div class="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-start max-w-md mx-auto shadow-2xl border-x border-slate-900">
+<div class="min-h-screen bg-[#06070a] text-slate-100 flex flex-col justify-start max-w-md mx-auto shadow-2xl border-x border-white/[0.06] font-sans pb-16">
   
-  <!-- Header Telemetry Bar -->
-  <header class="px-5 py-3 border-b border-slate-900 flex items-center justify-between bg-slate-950/80 backdrop-blur sticky top-0 z-20">
-    <div class="flex items-center gap-2">
-      <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
-      <h1 class="font-mono tracking-widest text-xs uppercase font-semibold text-slate-300">
-        VAGUS // TELEMETRY
-      </h1>
+  <!-- 1. WHOOP Header Bar: Athlete Identity & Sync Status -->
+  <header class="px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between bg-[#06070a]/90 backdrop-blur-xl sticky top-0 z-30">
+    <div class="flex items-center gap-2.5">
+      <!-- Live Status Orb -->
+      <div class="relative flex items-center justify-center">
+        <span class="w-2.5 h-2.5 rounded-full" [ngClass]="recoveryColor().stroke === '#00F5A0' ? 'bg-[#00F5A0] shadow-[0_0_8px_#00F5A0]' : (recoveryColor().stroke === '#FFB800' ? 'bg-[#FFB800] shadow-[0_0_8px_#FFB800]' : 'bg-[#FF334B] shadow-[0_0_8px_#FF334B]')"></span>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="font-mono text-xs font-bold tracking-wider text-white">VAGUS</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-white/[0.06] text-zinc-400 border border-white/[0.08]">
+            {{ todayLog()?.date || 'TODAY' }}
+          </span>
+        </div>
+      </div>
     </div>
 
+    <!-- Quick Actions Pill & Hardware Status -->
     <div class="flex items-center gap-2">
+      <!-- Polar BLE Status Chip -->
       <button
-        (click)="requestPermissions()"
-        class="text-[10px] font-mono px-2 py-1 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
-        title="Sync Device Sensors"
+        type="button"
+        (click)="setPillar('sensors'); setHardwareTab('polar')"
+        class="text-[10px] font-mono px-2 py-0.8 rounded-full border transition-all flex items-center gap-1.5 cursor-pointer"
+        [ngClass]="bleHR.isConnected() ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-300' : 'bg-white/[0.04] border-white/[0.08] text-zinc-400 hover:text-white'"
       >
-        <span *ngIf="permissionGranted(); else notSynced" class="text-emerald-400">● SYNCED</span>
-        <ng-template #notSynced>CONNECT</ng-template>
+        <span class="w-1.5 h-1.5 rounded-full" [ngClass]="bleHR.isConnected() ? 'bg-indigo-400 animate-pulse' : 'bg-zinc-600'"></span>
+        <span>{{ bleHR.isConnected() ? 'H7 ' + bleHR.liveBpm() + ' BPM' : 'SENSORS' }}</span>
       </button>
 
+      <!-- Athlete Demographics / Settings Cog -->
       <button
-        (click)="resetAllData()"
-        class="text-[10px] font-mono px-2 py-1 rounded bg-rose-500/10 border border-rose-500/30 text-rose-300 hover:bg-rose-500/20 transition-colors"
-        title="Wipe simulated mock data and start with a clean real state"
+        type="button"
+        (click)="openProfileModal()"
+        class="w-7 h-7 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] flex items-center justify-center text-zinc-300 hover:text-white transition-colors cursor-pointer"
+        title="Athlete Profile & Biometrics Settings"
       >
-        RESET ALL DATA
-      </button>
-
-      <button
-        (click)="seedInitialData()"
-        [disabled]="isSeeding()"
-        class="text-[10px] font-mono px-1.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-500 hover:text-slate-300 transition-colors disabled:opacity-50"
-        title="Load simulated 30-day historical test data"
-      >
-        {{ isSeeding() ? '...' : 'MOCK 30D' }}
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
       </button>
     </div>
   </header>
 
-  <!-- User Account & Document Identity Banner -->
-  <section class="px-5 py-3 bg-slate-900/40 border-b border-slate-900">
-    <!-- Logged In State -->
-    <div *ngIf="authService.currentUser() as user; else loggedOutState" class="flex items-center justify-between">
-      <div class="flex items-center gap-2.5">
-        <img
-          *ngIf="user.photoURL; else defaultAvatar"
-          [src]="user.photoURL"
-          alt="Avatar"
-          class="w-8 h-8 rounded-full border border-emerald-500/40 object-cover"
-        />
-        <ng-template #defaultAvatar>
-          <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-mono text-xs font-bold text-emerald-400">
-            {{ (user.displayName || user.email || 'U').charAt(0).toUpperCase() }}
-          </div>
-        </ng-template>
-
-        <div class="leading-tight">
-          <div class="text-xs font-mono font-semibold text-slate-200 truncate max-w-[170px]">
-            {{ user.displayName || user.email }}
-          </div>
-          <div class="text-[9px] font-mono text-slate-500 truncate max-w-[170px]">
-            users/{{ user.uid.slice(0, 12) }}...
-          </div>
-        </div>
+  <!-- 2. Athlete Profile & Cloud Sync Strip -->
+  <section class="px-5 py-2.5 bg-gradient-to-r from-white/[0.02] to-transparent border-b border-white/[0.05] flex items-center justify-between text-[11px] font-mono">
+    <!-- Logged in state -->
+    <div *ngIf="authService.currentUser() as user; else guestAuthStrip" class="flex items-center gap-2 truncate">
+      <div class="w-5 h-5 rounded-full bg-white/[0.08] border border-white/[0.1] flex items-center justify-center text-[10px] text-[#00F5A0] font-bold">
+        {{ (user.displayName || user.email || 'A').charAt(0).toUpperCase() }}
       </div>
-
-      <div class="flex items-center gap-2">
-        <span class="text-[9px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40">
-          DOC SYNCED
-        </span>
-        <button
-          type="button"
-          (click)="logout()"
-          class="text-[10px] font-mono px-2 py-1 rounded bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/60 transition-colors"
-        >
-          LOGOUT
-        </button>
-      </div>
+      <span class="text-zinc-300 font-semibold truncate max-w-[130px]">{{ user.displayName || user.email }}</span>
+      <span class="text-zinc-600">•</span>
+      <span class="text-zinc-400">{{ athleteDemographics().age }}y / {{ athleteDemographics().weightKg }}kg</span>
     </div>
 
-    <!-- Logged Out State: Google Sign-In -->
-    <ng-template #loggedOutState>
-      <div class="flex items-center justify-between">
-        <div class="leading-tight">
-          <div class="text-xs font-mono text-slate-300 font-medium">GUEST ATHLETE SESSION</div>
-          <div class="text-[10px] font-mono text-slate-500">Sign in to sync your cloud physiology document</div>
-        </div>
-
-        <div class="flex items-center gap-1.5">
-          <button
-            type="button"
-            (click)="loginGoogle()"
-            [disabled]="authService.isLoading()"
-            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white text-slate-900 hover:bg-slate-100 font-mono text-xs font-semibold shadow transition-all disabled:opacity-50 cursor-pointer"
-          >
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/>
-              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24Z"/>
-              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15Z"/>
-              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"/>
-            </svg>
-            <span>{{ authService.isLoading() ? '...' : 'GOOGLE' }}</span>
-          </button>
-
-          <button
-            type="button"
-            (click)="showEmailLoginModal.set(true)"
-            class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-xs font-semibold transition-colors cursor-pointer"
-            title="Sign in with Email & Password (Works anywhere)"
-          >
-            ✉️ EMAIL
-          </button>
-        </div>
-      </div>
-      <div *ngIf="authService.authError()" class="mt-2 p-2 rounded bg-amber-950/40 border border-amber-800/40 flex items-center justify-between text-[10px] font-mono text-amber-300">
-        <span class="truncate mr-2">{{ authService.authError() }}</span>
-        <button
-          type="button"
-          (click)="loginDemo()"
-          class="shrink-0 px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-bold"
-        >
-          DEMO LOGIN
+    <!-- Guest / Sign In State -->
+    <ng-template #guestAuthStrip>
+      <div class="flex items-center gap-2 text-zinc-400">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+        <span>GUEST ATHLETE</span>
+        <span class="text-zinc-600">•</span>
+        <button (click)="openProfileModal()" class="text-cyan-400 hover:underline">
+          {{ athleteDemographics().gender | uppercase }} {{ athleteDemographics().age }}y
         </button>
       </div>
     </ng-template>
 
-    <!-- Athlete Demographics Quick Bar (Calibrated Stats) -->
-    <div class="mt-2.5 pt-2.5 border-t border-slate-800/70 flex items-center justify-between text-[10px] font-mono">
-      <div class="text-slate-400 flex items-center gap-1.5 flex-wrap">
-        <span class="text-cyan-400 font-bold uppercase">{{ athleteDemographics().gender }}</span>
-        <span>•</span>
-        <span>{{ athleteDemographics().age }}y</span>
-        <span>•</span>
-        <span>{{ athleteDemographics().weightKg }}kg</span>
-        <span>•</span>
-        <span>{{ athleteDemographics().heightCm }}cm</span>
-        <span>•</span>
-        <span class="text-rose-400 font-bold">MaxHR: {{ calibratedMaxHR() }} bpm</span>
+    <!-- Cloud Sync & Login Shortcuts -->
+    <div class="flex items-center gap-1.5 shrink-0">
+      <div *ngIf="authService.currentUser(); else authButtons">
+        <button
+          type="button"
+          (click)="logout()"
+          class="text-[9px] text-zinc-400 hover:text-rose-400 px-2 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] transition-colors"
+        >
+          LOGOUT
+        </button>
       </div>
-
-      <button
-        type="button"
-        (click)="openProfileModal()"
-        class="shrink-0 ml-2 px-2 py-0.5 rounded bg-cyan-950/60 hover:bg-cyan-900/60 border border-cyan-800/60 text-cyan-300 font-bold transition-colors cursor-pointer"
-        title="Edit Age, Gender, Weight, Height to recalibrate MaxHR and TRIMP"
-      >
-        ⚙️ EDIT STATS
-      </button>
+      <ng-template #authButtons>
+        <button
+          type="button"
+          (click)="loginGoogle()"
+          [disabled]="authService.isLoading()"
+          class="text-[9px] font-bold text-white px-2 py-0.5 rounded bg-white/[0.08] hover:bg-white/[0.12] border border-white/[0.1] transition-colors cursor-pointer"
+        >
+          GOOGLE
+        </button>
+        <button
+          type="button"
+          (click)="showEmailLoginModal.set(true)"
+          class="text-[9px] font-bold text-cyan-300 px-2 py-0.5 rounded bg-cyan-950/40 hover:bg-cyan-900/40 border border-cyan-800/50 transition-colors cursor-pointer"
+        >
+          EMAIL
+        </button>
+      </ng-template>
     </div>
   </section>
 
-  <!-- Main Scrollable Diagnostics Viewport -->
-  <main class="flex-1 p-5 space-y-6 overflow-y-auto">
+  <!-- 3. WHOOP 4.0 Signature Segmented Navigation Bar -->
+  <nav class="px-5 pt-3 pb-2 sticky top-[57px] z-20 bg-[#06070a]/95 backdrop-blur-md">
+    <div class="p-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-between text-[11px] font-mono tracking-wider font-semibold">
+      <button
+        type="button"
+        (click)="setPillar('overview')"
+        class="flex-1 py-1.5 rounded-xl transition-all text-center cursor-pointer"
+        [ngClass]="activePillar() === 'overview' ? 'bg-white/[0.12] text-white shadow-sm font-bold border border-white/[0.1]' : 'text-zinc-400 hover:text-zinc-200'"
+      >
+        OVERVIEW
+      </button>
 
-    <!-- Date & Telemetry Status Banner -->
-    <div class="flex items-baseline justify-between text-xs font-mono text-slate-400">
-      <span>LOGGED: {{ todayLog()?.date || 'NOCTURNAL EPOCH' }}</span>
-      <span class="tracking-wider text-[11px] uppercase" [ngClass]="recoveryColor().text">
-        {{ recoveryStatusText() }}
-      </span>
+      <button
+        type="button"
+        (click)="setPillar('recovery')"
+        class="flex-1 py-1.5 rounded-xl transition-all text-center cursor-pointer flex items-center justify-center gap-1"
+        [ngClass]="activePillar() === 'recovery' ? 'bg-[#00F5A0]/20 text-[#00F5A0] shadow-sm font-bold border border-[#00F5A0]/40' : 'text-zinc-400 hover:text-zinc-200'"
+      >
+        <span>RECOVERY</span>
+      </button>
+
+      <button
+        type="button"
+        (click)="setPillar('strain')"
+        class="flex-1 py-1.5 rounded-xl transition-all text-center cursor-pointer flex items-center justify-center gap-1"
+        [ngClass]="activePillar() === 'strain' ? 'bg-cyan-500/20 text-cyan-300 shadow-sm font-bold border border-cyan-500/40' : 'text-zinc-400 hover:text-zinc-200'"
+      >
+        <span>STRAIN</span>
+      </button>
+
+      <button
+        type="button"
+        (click)="setPillar('sleep')"
+        class="flex-1 py-1.5 rounded-xl transition-all text-center cursor-pointer flex items-center justify-center gap-1"
+        [ngClass]="activePillar() === 'sleep' ? 'bg-indigo-500/20 text-indigo-300 shadow-sm font-bold border border-indigo-500/40' : 'text-zinc-400 hover:text-zinc-200'"
+      >
+        <span>SLEEP</span>
+      </button>
+
+      <button
+        type="button"
+        (click)="setPillar('sensors')"
+        class="flex-1 py-1.5 rounded-xl transition-all text-center cursor-pointer flex items-center justify-center gap-1"
+        [ngClass]="activePillar() === 'sensors' ? 'bg-amber-500/20 text-amber-300 shadow-sm font-bold border border-amber-500/40' : 'text-zinc-400 hover:text-zinc-200'"
+      >
+        <span>SENSORS</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- 4. Main Scrollable Telemetry Viewport -->
+  <main class="flex-1 px-5 pt-2 pb-6 space-y-5 overflow-y-auto">
+
+    <!-- ================================================================= -->
+    <!-- TAB 1: OVERVIEW PILLAR                                            -->
+    <!-- ================================================================= -->
+    <div *ngIf="activePillar() === 'overview'" class="space-y-5">
+
+      <!-- THE HERO RECOVERY DIAL (SIGNATURE WHOOP 4.0 RING) -->
+      <section class="whoop-surface p-6 rounded-3xl relative overflow-hidden flex flex-col items-center justify-center text-center">
+        <!-- Soft Ambient Radial Glow Behind Ring -->
+        <div
+          class="absolute -top-12 w-64 h-64 rounded-full pointer-events-none opacity-20 blur-3xl transition-colors duration-1000"
+          [style.background]="recoveryColor().stroke"
+        ></div>
+
+        <!-- Metric Header -->
+        <div class="flex items-center justify-between w-full mb-3 text-[10px] font-mono tracking-widest text-zinc-400 uppercase">
+          <span>DAILY RECOVERY</span>
+          <span class="px-2 py-0.5 rounded-full font-bold border" [ngClass]="recoveryColor().bg + ' ' + recoveryColor().text + ' ' + recoveryColor().border">
+            {{ recoveryColor().zone }}
+          </span>
+        </div>
+
+        <!-- The Radial Gauge -->
+        <div class="relative w-52 h-52 flex items-center justify-center my-1">
+          <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 190 190">
+            <!-- Background Inactive Track -->
+            <circle
+              cx="95"
+              cy="95"
+              r="80"
+              stroke="rgba(255, 255, 255, 0.08)"
+              stroke-width="12"
+              fill="transparent"
+            />
+            <!-- Active Illuminated Recovery Arc -->
+            <circle
+              cx="95"
+              cy="95"
+              r="80"
+              [attr.stroke]="recoveryColor().stroke"
+              stroke-width="12"
+              stroke-linecap="round"
+              fill="transparent"
+              [style.strokeDasharray]="circumference"
+              [style.strokeDashoffset]="strokeDashoffset()"
+              class="transition-all duration-1000 ease-out"
+              [style.filter]="'drop-shadow(0 0 12px ' + recoveryColor().glow + ')'"
+            />
+          </svg>
+
+          <!-- Centered Hero Score -->
+          <div class="absolute flex flex-col items-center justify-center">
+            <div class="flex items-baseline">
+              <span class="text-6xl font-sans font-black tracking-tight" [ngClass]="recoveryColor().text">
+                {{ recoveryScore() }}
+              </span>
+              <span class="text-2xl font-light text-zinc-400 ml-0.5">%</span>
+            </div>
+            <span class="text-[10px] font-mono tracking-[0.2em] uppercase font-bold text-zinc-400 mt-1">
+              {{ recoveryStatusText() }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Nocturnal Vitals Strip (RMSSD, RHR, SLEEP) -->
+        <div class="grid grid-cols-3 w-full mt-4 pt-4 border-t border-white/[0.06] text-center font-mono">
+          <div class="cursor-pointer hover:bg-white/[0.02] rounded-xl py-1 transition-colors" (click)="setPillar('recovery')">
+            <div class="text-[9px] text-zinc-500 uppercase tracking-widest font-semibold">RMSSD (HRV)</div>
+            <div class="text-white font-bold text-base mt-0.5">
+              {{ todayLog()?.biometrics?.overnightRMSSD || 0 }} <span class="text-[10px] text-zinc-400 font-normal">ms</span>
+            </div>
+          </div>
+
+          <div class="border-x border-white/[0.06] cursor-pointer hover:bg-white/[0.02] rounded-xl py-1 transition-colors" (click)="setPillar('recovery')">
+            <div class="text-[9px] text-zinc-500 uppercase tracking-widest font-semibold">RESTING HR</div>
+            <div class="text-white font-bold text-base mt-0.5">
+              {{ todayLog()?.biometrics?.restingHR || 0 }} <span class="text-[10px] text-zinc-400 font-normal">bpm</span>
+            </div>
+          </div>
+
+          <div class="cursor-pointer hover:bg-white/[0.02] rounded-xl py-1 transition-colors" (click)="setPillar('sleep')">
+            <div class="text-[9px] text-zinc-500 uppercase tracking-widest font-semibold">SLEEP RECORD</div>
+            <div class="text-white font-bold text-base mt-0.5">
+              {{ formatMinutesToHours(todayLog()?.biometrics?.sleepMinutes || 0) }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Access Utilities (Vagus Resonance Pacer + Algorithm Inspector) -->
+        <div class="grid grid-cols-2 gap-2 w-full mt-4 pt-3 border-t border-white/[0.06] text-xs font-mono">
+          <button
+            type="button"
+            (click)="toggleVagusPacer()"
+            class="py-2 px-3 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer"
+          >
+            <span>🧘 VAGUS PACER (0.1 Hz)</span>
+          </button>
+
+          <button
+            type="button"
+            (click)="toggleAlgorithmInspector()"
+            class="py-2 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer"
+          >
+            <span>🔍 ALGORITHM LOGIC</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- DAY STRAIN HERO CARD (0.0 – 21.0 LOGARITHMIC TRIMP SCALE) -->
+      <section
+        (click)="setPillar('strain')"
+        class="whoop-surface p-5 rounded-3xl cursor-pointer hover:border-cyan-500/30 transition-all space-y-3"
+      >
+        <div class="flex items-baseline justify-between font-mono">
+          <div class="flex items-center gap-2">
+            <div class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#00F0FF]"></div>
+            <div>
+              <span class="text-xs uppercase tracking-wider text-white font-bold">DAY STRAIN</span>
+              <span class="text-[10px] text-zinc-500 ml-1.5">BANISTER TRIMP</span>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="text-3xl font-sans font-black text-cyan-400">{{ strainScore() }}</span>
+            <span class="text-xs font-mono text-zinc-500"> / 21.0</span>
+          </div>
+        </div>
+
+        <!-- Logarithmic Scale Track with Target Optimal Zone -->
+        <div class="relative w-full h-3.5 bg-black/50 rounded-full overflow-hidden my-2 border border-white/[0.05]">
+          <!-- Target Band Zone Marker -->
+          <div
+            class="absolute top-0 bottom-0 bg-cyan-500/20 border-x border-cyan-400/60"
+            [style.left.%]="(targetStrain().min / 21.0) * 100"
+            [style.width.%]="((targetStrain().max - targetStrain().min) / 21.0) * 100"
+            title="Prescribed Recovery-Calibrated Strain Target"
+          ></div>
+
+          <!-- Active Accumulated Strain Gradient Bar -->
+          <div
+            class="h-full bg-gradient-to-r from-blue-600 via-cyan-400 to-teal-300 rounded-full transition-all duration-700 ease-out shadow-[0_0_12px_rgba(0,240,255,0.4)]"
+            [style.width.%]="(strainScore() / 21.0) * 100"
+          ></div>
+        </div>
+
+        <!-- Target Prescriptive Range Label -->
+        <div class="flex justify-between items-center text-[10px] font-mono text-zinc-400">
+          <span>0.0 REST</span>
+          <div class="px-2.5 py-0.5 rounded-full bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 font-bold">
+            TARGET: {{ targetStrain().target }} ({{ targetStrain().min }}–{{ targetStrain().max }})
+          </div>
+          <span>21.0 ALL-OUT</span>
+        </div>
+
+        <!-- Footsteps & Calorie Strip inside Strain Card -->
+        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-white/[0.05] text-[11px] font-mono">
+          <div class="p-2.5 rounded-xl bg-black/40 border border-white/[0.04] flex items-center justify-between">
+            <span class="text-zinc-500 uppercase">ACTIVE STEPS</span>
+            <span class="text-white font-bold">{{ liveSteps() | number }}</span>
+          </div>
+          <div class="p-2.5 rounded-xl bg-black/40 border border-white/[0.04] flex items-center justify-between">
+            <span class="text-zinc-500 uppercase">ACTIVE BURN</span>
+            <span class="text-white font-bold">{{ estimatedActiveCalories() }} kcal</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- TONIGHT'S SLEEP NEED & CIRCADIAN GATE CARD -->
+      <section
+        (click)="setPillar('sleep')"
+        class="whoop-surface p-5 rounded-3xl cursor-pointer hover:border-indigo-500/30 transition-all space-y-3 font-mono"
+      >
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-2.5 h-2.5 rounded-full bg-indigo-400 shadow-[0_0_8px_#7B61FF]"></div>
+            <div>
+              <span class="text-xs uppercase tracking-wider text-white font-bold">SLEEP NEED & CIRCADIAN</span>
+              <span class="text-[10px] text-zinc-500 ml-1.5">TONIGHT</span>
+            </div>
+          </div>
+          <span class="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/40 text-indigo-300 font-bold">
+            {{ formatMinutesToHours(tonightSleepNeedMinutes()) }} NEED
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="p-3 rounded-2xl bg-black/40 border border-white/[0.04] space-y-1">
+            <div class="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">MELATONIN ONSET GATE</div>
+            <div class="text-sm font-bold text-amber-300">{{ circadianMelatoninWindow() }}</div>
+            <div class="text-[9px] text-zinc-400 font-sans">
+              {{ todayLog()?.journalHabits?.viewedSunlight ? 'Anchored by morning sunlight.' : 'No sunlight logged. Expect circadian delay.' }}
+            </div>
+          </div>
+
+          <div class="p-3 rounded-2xl bg-black/40 border border-white/[0.04] space-y-1">
+            <div class="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">PEAK ATHLETIC WINDOW</div>
+            <div class="text-sm font-bold text-cyan-400">{{ peakAthleticWindow() }}</div>
+            <div class="text-[9px] text-zinc-400 font-sans">Optimal core body temp & vagal tone.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MORNING LIFESTYLE JOURNAL: INSTANT AUTONOMIC RECALCULATION -->
+      <section class="whoop-surface p-5 rounded-3xl space-y-3 font-mono">
+        <div class="flex items-center justify-between">
+          <div class="text-xs uppercase tracking-wider text-white font-bold">
+            LIFESTYLE JOURNAL // CORRELATIONS
+          </div>
+          <span class="text-[9px] text-[#00F5A0] bg-[#00F5A0]/10 border border-[#00F5A0]/30 px-2 py-0.5 rounded-full font-bold">
+            LIVE RECALC
+          </span>
+        </div>
+        <p class="text-[11px] text-zinc-400 font-sans">
+          Toggle habits to model instantaneous parasympathetic restitution deltas:
+        </p>
+
+        <div class="grid grid-cols-2 gap-2.5 pt-1">
+          <!-- Habit: Alcohol -->
+          <button
+            type="button"
+            (click)="toggleHabit('drankAlcohol')"
+            class="p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between"
+            [ngClass]="todayLog()?.journalHabits?.drankAlcohol ? 'bg-rose-500/15 border-rose-500/50 shadow-[0_0_12px_rgba(255,51,75,0.2)]' : 'bg-black/30 border-white/[0.06] hover:border-white/[0.12]'"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white">ALCOHOL</span>
+              <div class="w-3.5 h-3.5 rounded-full flex items-center justify-center border" [ngClass]="todayLog()?.journalHabits?.drankAlcohol ? 'bg-rose-500 border-rose-400' : 'border-zinc-700'">
+                <span *ngIf="todayLog()?.journalHabits?.drankAlcohol" class="text-[9px] text-black font-black">✓</span>
+              </div>
+            </div>
+            <span class="text-[9px] text-rose-400 mt-2 font-mono">-25% HRV / +5 RHR</span>
+          </button>
+
+          <!-- Habit: Late Meal -->
+          <button
+            type="button"
+            (click)="toggleHabit('lateMeal')"
+            class="p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between"
+            [ngClass]="todayLog()?.journalHabits?.lateMeal ? 'bg-amber-500/15 border-amber-500/50 shadow-[0_0_12px_rgba(255,184,0,0.2)]' : 'bg-black/30 border-white/[0.06] hover:border-white/[0.12]'"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white">LATE MEAL</span>
+              <div class="w-3.5 h-3.5 rounded-full flex items-center justify-center border" [ngClass]="todayLog()?.journalHabits?.lateMeal ? 'bg-amber-500 border-amber-400' : 'border-zinc-700'">
+                <span *ngIf="todayLog()?.journalHabits?.lateMeal" class="text-[9px] text-black font-black">✓</span>
+              </div>
+            </div>
+            <span class="text-[9px] text-amber-400 mt-2 font-mono">-12% HRV / +3 HR</span>
+          </button>
+
+          <!-- Habit: Morning Sunlight -->
+          <button
+            type="button"
+            (click)="toggleHabit('viewedSunlight')"
+            class="p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between"
+            [ngClass]="todayLog()?.journalHabits?.viewedSunlight ? 'bg-[#00F5A0]/15 border-[#00F5A0]/50 shadow-[0_0_12px_rgba(0,245,160,0.2)]' : 'bg-black/30 border-white/[0.06] hover:border-white/[0.12]'"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white">SUNLIGHT</span>
+              <div class="w-3.5 h-3.5 rounded-full flex items-center justify-center border" [ngClass]="todayLog()?.journalHabits?.viewedSunlight ? 'bg-[#00F5A0] border-[#00F5A0]' : 'border-zinc-700'">
+                <span *ngIf="todayLog()?.journalHabits?.viewedSunlight" class="text-[9px] text-black font-black">✓</span>
+              </div>
+            </div>
+            <span class="text-[9px] text-[#00F5A0] mt-2 font-mono">+15% DEEP SLEEP</span>
+          </button>
+
+          <!-- Habit: Caffeine > 2PM -->
+          <button
+            type="button"
+            (click)="toggleHabit('caffeineAfter2PM')"
+            class="p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between"
+            [ngClass]="todayLog()?.journalHabits?.caffeineAfter2PM ? 'bg-purple-500/15 border-purple-500/50 shadow-[0_0_12px_rgba(168,85,247,0.2)]' : 'bg-black/30 border-white/[0.06] hover:border-white/[0.12]'"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white">CAFFEINE >2PM</span>
+              <div class="w-3.5 h-3.5 rounded-full flex items-center justify-center border" [ngClass]="todayLog()?.journalHabits?.caffeineAfter2PM ? 'bg-purple-500 border-purple-400' : 'border-zinc-700'">
+                <span *ngIf="todayLog()?.journalHabits?.caffeineAfter2PM" class="text-[9px] text-black font-black">✓</span>
+              </div>
+            </div>
+            <span class="text-[9px] text-purple-300 mt-2 font-mono">ADENOSINE BLOCK</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 7-DAY RECOVERY HISTORY (SYSTEMIC EQUILIBRIUM SPARKBARS) -->
+      <section class="whoop-surface p-5 rounded-3xl space-y-3 font-mono">
+        <div class="flex items-baseline justify-between text-xs">
+          <span class="text-white font-bold uppercase tracking-wider">7-DAY RECOVERY EQUILIBRIUM</span>
+          <span class="text-[10px] text-zinc-500">ADAPTATION CAPACITY</span>
+        </div>
+
+        <div class="grid grid-cols-7 gap-2 h-24 items-end pt-3">
+          <div *ngFor="let item of recentLogs()" class="flex flex-col items-center gap-1.5 h-full justify-end group">
+            <div
+              class="w-full rounded-md transition-all duration-300 relative shadow-sm"
+              [ngClass]="item.scores.calculatedRecovery > 66 ? 'bg-[#00F5A0]' : item.scores.calculatedRecovery >= 34 ? 'bg-[#FFB800]' : 'bg-[#FF334B]'"
+              [style.height.%]="item.scores.calculatedRecovery"
+              [title]="item.date + ': Recovery ' + item.scores.calculatedRecovery + '%, Strain ' + item.scores.calculatedStrain"
+            ></div>
+            <span class="text-[9px] font-mono text-zinc-500">
+              {{ item.date.slice(8) }}
+            </span>
+          </div>
+        </div>
+      </section>
+
     </div>
 
-    <!-- DIAGNOSTIC BLOCK 1: Central Radial Recovery Gauge -->
-    <section class="relative flex flex-col items-center justify-center p-6 rounded-2xl bg-gradient-to-b from-slate-900/90 to-slate-950 border border-slate-800/80 shadow-lg">
-      <div class="relative w-48 h-48 flex items-center justify-center">
-        <!-- SVG Radial Progress Ring -->
-        <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 160 160">
-          <circle
-            cx="80"
-            cy="80"
-            r="72"
-            stroke="currentColor"
-            stroke-width="9"
-            fill="transparent"
-            class="text-slate-800/50"
-          />
-          <circle
-            cx="80"
-            cy="80"
-            r="72"
-            [attr.stroke]="recoveryColor().stroke"
-            stroke-width="9"
-            stroke-linecap="round"
-            fill="transparent"
-            [style.strokeDasharray]="circumference"
-            [style.strokeDashoffset]="strokeDashoffset()"
-            class="transition-all duration-700 ease-out"
-          />
-        </svg>
-
-        <!-- Center Value Display -->
-        <div class="absolute flex flex-col items-center justify-center text-center">
-          <span class="text-5xl font-mono font-bold tracking-tighter" [ngClass]="recoveryColor().text">
-            {{ recoveryScore() }}<span class="text-2xl font-light">%</span>
-          </span>
-          <span class="text-[10px] font-mono tracking-widest text-slate-400 uppercase mt-0.5">
-            RECOVERY
+    <!-- ================================================================= -->
+    <!-- TAB 2: RECOVERY DEEP DIVE                                         -->
+    <!-- ================================================================= -->
+    <div *ngIf="activePillar() === 'recovery'" class="space-y-5">
+      <!-- Recovery Hero Dial -->
+      <section class="whoop-surface p-6 rounded-3xl text-center space-y-4">
+        <div class="flex items-center justify-between text-[10px] font-mono tracking-widest text-zinc-400 uppercase">
+          <span>PARASYMPATHETIC METRICS</span>
+          <span class="px-2 py-0.5 rounded-full font-bold border" [ngClass]="recoveryColor().bg + ' ' + recoveryColor().text + ' ' + recoveryColor().border">
+            {{ recoveryColor().zone }}
           </span>
         </div>
-      </div>
 
-      <!-- Overnight Vagal Telemetry Strip -->
-      <div class="grid grid-cols-3 w-full mt-6 pt-4 border-t border-slate-800/60 text-center font-mono text-xs">
-        <div>
-          <div class="text-[10px] text-slate-500 uppercase tracking-wider">RMSSD</div>
-          <div class="text-slate-200 font-semibold text-sm mt-0.5">
-            {{ todayLog()?.biometrics?.overnightRMSSD || 0 }} <span class="text-[10px] text-slate-500 font-normal">ms</span>
+        <div class="relative w-48 h-48 mx-auto flex items-center justify-center">
+          <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 190 190">
+            <circle cx="95" cy="95" r="80" stroke="rgba(255, 255, 255, 0.08)" stroke-width="12" fill="transparent" />
+            <circle
+              cx="95"
+              cy="95"
+              r="80"
+              [attr.stroke]="recoveryColor().stroke"
+              stroke-width="12"
+              stroke-linecap="round"
+              fill="transparent"
+              [style.strokeDasharray]="circumference"
+              [style.strokeDashoffset]="strokeDashoffset()"
+              class="transition-all duration-1000 ease-out"
+              [style.filter]="'drop-shadow(0 0 12px ' + recoveryColor().glow + ')'"
+            />
+          </svg>
+          <div class="absolute flex flex-col items-center">
+            <span class="text-5xl font-black" [ngClass]="recoveryColor().text">{{ recoveryScore() }}%</span>
+            <span class="text-[10px] font-mono uppercase text-zinc-400 mt-1">{{ recoveryStatusText() }}</span>
           </div>
         </div>
-        <div class="border-x border-slate-800/60">
-          <div class="text-[10px] text-slate-500 uppercase tracking-wider">RESTING HR</div>
-          <div class="text-slate-200 font-semibold text-sm mt-0.5">
-            {{ todayLog()?.biometrics?.restingHR || 0 }} <span class="text-[10px] text-slate-500 font-normal">bpm</span>
-          </div>
-        </div>
-        <div>
-          <div class="text-[10px] text-slate-500 uppercase tracking-wider">SLEEP</div>
-          <div class="text-slate-200 font-semibold text-sm mt-0.5">
-            {{ formatMinutesToHours(todayLog()?.biometrics?.sleepMinutes || 0) }}
-          </div>
-        </div>
-      </div>
 
-      <!-- Quick Action Utilities: Vagus Pacer & Algorithm Inspector -->
-      <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-800/80 w-full font-mono text-xs">
+        <div class="grid grid-cols-2 gap-3 pt-2 font-mono text-xs">
+          <div class="p-3 rounded-2xl bg-black/40 border border-white/[0.04]">
+            <div class="text-[9px] text-zinc-500 uppercase">OVERNIGHT RMSSD</div>
+            <div class="text-xl font-bold text-[#00F5A0] mt-0.5">{{ todayLog()?.biometrics?.overnightRMSSD || 0 }} ms</div>
+          </div>
+          <div class="p-3 rounded-2xl bg-black/40 border border-white/[0.04]">
+            <div class="text-[9px] text-zinc-500 uppercase">RESTING HEART RATE</div>
+            <div class="text-xl font-bold text-cyan-400 mt-0.5">{{ todayLog()?.biometrics?.restingHR || 0 }} bpm</div>
+          </div>
+        </div>
+
+        <!-- Launch Vagus Breathing Pacer Button -->
         <button
           type="button"
           (click)="toggleVagusPacer()"
-          class="py-2 px-3 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+          class="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-teal-500/20 to-emerald-500/20 hover:from-teal-500/30 hover:to-emerald-500/30 border border-teal-500/40 text-teal-300 font-mono text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2"
         >
-          <span>🧘 VAGUS PACER (0.1 Hz)</span>
+          <span>🧘 LAUNCH 0.1 HZ VAGAL RESONANCE PACER</span>
+        </button>
+      </section>
+
+      <!-- Advanced Autonomic Steering Index -->
+      <section class="whoop-surface p-5 rounded-3xl space-y-3 font-mono">
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-white font-bold uppercase tracking-wider">AUTONOMIC STEERING INDEX</span>
+          <span class="text-sm font-bold" [ngClass]="(todayLog()?.advancedKPIs?.autonomicSteeringIndex ?? 0) >= 0.1 ? 'text-[#00F5A0]' : 'text-rose-400'">
+            {{ todayLog()?.advancedKPIs?.autonomicSteeringIndex }}
+          </span>
+        </div>
+        <p class="text-[11px] text-zinc-400 font-sans leading-relaxed">
+          <span *ngIf="(todayLog()?.advancedKPIs?.autonomicSteeringIndex ?? 0) >= 0.1; else steeringSymp">
+            Vagal brake dominant [ln(RMSSD/RHR)*10]. Parasympathetic anti-inflammatory tone maintains rapid cardiovascular deceleration.
+          </span>
+          <ng-template #steeringSymp>
+            Sympathetic overdrive detected. Diminished vagal tone indicates autonomic tension or accumulated systemic stress.
+          </ng-template>
+        </p>
+      </section>
+
+      <!-- Cumulative Fatigue Drag -->
+      <section class="whoop-surface p-5 rounded-3xl space-y-3 font-mono">
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-white font-bold uppercase tracking-wider">CUMULATIVE FATIGUE DRAG</span>
+          <span class="text-sm font-bold" [ngClass]="(todayLog()?.advancedKPIs?.cumulativeFatigueDrag ?? 0) > 0 ? 'text-amber-400' : 'text-[#00F5A0]'">
+            {{ (todayLog()?.advancedKPIs?.cumulativeFatigueDrag ?? 0) > 0 ? '+' : '' }}{{ todayLog()?.advancedKPIs?.cumulativeFatigueDrag }}
+          </span>
+        </div>
+        <p class="text-[11px] text-zinc-400 font-sans leading-relaxed">
+          <span *ngIf="(todayLog()?.advancedKPIs?.cumulativeFatigueDrag ?? 0) > 0; else dragGood">
+            7-day cardiac strain outpaces systemic restitution. Restitution deficit signals elevated risk of overreaching.
+          </span>
+          <ng-template #dragGood>
+            Restitution buffer fully intact. Allostatic equilibrium indicates optimal adaptation capacity for high strain.
+          </ng-template>
+        </p>
+      </section>
+
+      <!-- Quick Scan Launcher -->
+      <button
+        type="button"
+        (click)="setPillar('sensors'); setHardwareTab('polar')"
+        class="w-full py-3 rounded-2xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] text-zinc-200 font-mono text-xs font-semibold tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer"
+      >
+        <span>📡 RECORD NEW RECOVERY SCAN VIA SENSORS &rarr;</span>
+      </button>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- TAB 3: STRAIN ENGINE                                              -->
+    <!-- ================================================================= -->
+    <div *ngIf="activePillar() === 'strain'" class="space-y-5">
+      <!-- Day Strain Card -->
+      <section class="whoop-surface p-6 rounded-3xl space-y-4 font-mono">
+        <div class="flex items-baseline justify-between">
+          <div>
+            <div class="text-xs uppercase tracking-wider text-white font-bold">DAY STRAIN TOTAL</div>
+            <div class="text-[10px] text-zinc-500">0.0 – 21.0 BANISTER TRIMP</div>
+          </div>
+          <div class="text-right">
+            <span class="text-4xl font-sans font-black text-cyan-400">{{ strainScore() }}</span>
+            <span class="text-xs text-zinc-500"> / 21.0</span>
+          </div>
+        </div>
+
+        <!-- Scale Progress Bar with Target Zone -->
+        <div class="relative w-full h-4 bg-black/60 rounded-full overflow-hidden border border-white/[0.05]">
+          <div
+            class="absolute top-0 bottom-0 bg-cyan-500/25 border-x border-cyan-400"
+            [style.left.%]="(targetStrain().min / 21.0) * 100"
+            [style.width.%]="((targetStrain().max - targetStrain().min) / 21.0) * 100"
+          ></div>
+          <div
+            class="h-full bg-gradient-to-r from-blue-600 via-cyan-400 to-teal-300 rounded-full transition-all duration-700"
+            [style.width.%]="(strainScore() / 21.0) * 100"
+          ></div>
+        </div>
+
+        <div class="flex items-center justify-between text-[10px] text-zinc-400">
+          <span class="px-2 py-0.5 rounded bg-white/[0.05] text-cyan-300 font-bold uppercase">
+            {{ strainZoneText() }}
+          </span>
+          <div class="text-center font-bold text-cyan-300 bg-cyan-950/60 px-2.5 py-0.5 rounded-full border border-cyan-800/60">
+            OPTIMAL TARGET: {{ targetStrain().target }} ({{ targetStrain().min }}–{{ targetStrain().max }})
+          </div>
+        </div>
+      </section>
+
+      <!-- Live Workout Strain Tracker (Polar BLE Realtime) -->
+      <section class="whoop-surface p-5 rounded-3xl space-y-3 font-mono">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-2.5 h-2.5 rounded-full" [ngClass]="bleHR.workoutSession().isActive ? 'bg-[#00F5A0] animate-pulse' : 'bg-zinc-600'"></div>
+            <span class="text-xs font-bold text-white uppercase tracking-wider">LIVE WORKOUT RECORDER</span>
+          </div>
+          <span *ngIf="bleHR.workoutSession().isActive" class="text-[9px] px-2 py-0.5 rounded-full bg-[#00F5A0]/20 text-[#00F5A0] font-bold animate-pulse">
+            RECORDING
+          </span>
+        </div>
+
+        <p class="text-[11px] text-zinc-400 font-sans">
+          Stream real-time cardiac workload from Polar H7 to accumulate Banister TRIMP directly into today's score:
+        </p>
+
+        <!-- Workout Inactive -->
+        <div *ngIf="!bleHR.workoutSession().isActive" class="pt-1">
+          <button
+            type="button"
+            (click)="toggleWorkoutTracker()"
+            class="w-full py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-bold uppercase tracking-wider text-xs transition-all shadow-md active:scale-[0.99] cursor-pointer"
+          >
+            START WORKOUT SESSION
+          </button>
+        </div>
+
+        <!-- Workout Active -->
+        <div *ngIf="bleHR.workoutSession().isActive" class="space-y-3 pt-1">
+          <div class="grid grid-cols-3 gap-2 text-center text-xs">
+            <div class="p-2.5 rounded-xl bg-black/40 border border-white/[0.06]">
+              <div class="text-[9px] text-zinc-500 uppercase">DURATION</div>
+              <div class="text-white font-bold text-sm mt-0.5">{{ formatMinutesToHours(bleHR.workoutSession().elapsedSeconds / 60) }}</div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-black/40 border border-white/[0.06]">
+              <div class="text-[9px] text-zinc-500 uppercase">MAX HR</div>
+              <div class="text-rose-400 font-bold text-sm mt-0.5">{{ bleHR.workoutSession().maxBpm }} bpm</div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-black/40 border border-white/[0.06]">
+              <div class="text-[9px] text-zinc-500 uppercase">+STRAIN</div>
+              <div class="text-cyan-400 font-bold text-sm mt-0.5">+{{ bleHR.workoutSession().accumulatedStrain }}</div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            (click)="toggleWorkoutTracker()"
+            class="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold uppercase tracking-wider text-xs transition-colors cursor-pointer"
+          >
+            FINISH WORKOUT & COMMIT STRAIN
+          </button>
+        </div>
+      </section>
+
+      <!-- Footsteps & Movement Telemetry -->
+      <section class="whoop-surface p-5 rounded-3xl space-y-3 font-mono">
+        <div class="flex items-center justify-between">
+          <div class="text-xs font-bold text-white uppercase tracking-wider">FOOTSTEPS TELEMETRY</div>
+          <span class="text-[10px] text-[#00F5A0] font-bold">{{ stepProgressPercent() }}% GOAL</span>
+        </div>
+
+        <div class="flex items-baseline justify-between">
+          <div class="text-3xl font-sans font-black text-white">
+            {{ liveSteps() | number }}
+            <span class="text-xs font-mono text-zinc-500 font-normal">/ {{ stepGoal() | number }} steps</span>
+          </div>
+        </div>
+
+        <div class="w-full h-2.5 bg-black/50 rounded-full overflow-hidden border border-white/[0.05]">
+          <div class="h-full bg-gradient-to-r from-emerald-500 to-teal-300 rounded-full transition-all duration-500" [style.width.%]="stepProgressPercent()"></div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 pt-2 border-t border-white/[0.05] text-center text-xs">
+          <div>
+            <div class="text-[9px] text-zinc-500 uppercase">CADENCE</div>
+            <div class="text-white font-bold mt-0.5">{{ pedometer.activeCadence() }} <span class="text-[9px] text-zinc-500 font-normal">spm</span></div>
+          </div>
+          <div class="border-x border-white/[0.06]">
+            <div class="text-[9px] text-zinc-500 uppercase">DISTANCE</div>
+            <div class="text-white font-bold mt-0.5">{{ estimatedDistanceKm() }} <span class="text-[9px] text-zinc-500 font-normal">km</span></div>
+          </div>
+          <div>
+            <div class="text-[9px] text-zinc-500 uppercase">ACTIVE BURN</div>
+            <div class="text-white font-bold mt-0.5">{{ estimatedActiveCalories() }} <span class="text-[9px] text-zinc-500 font-normal">kcal</span></div>
+          </div>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button
+            type="button"
+            (click)="openStepSyncModal()"
+            class="flex-1 py-2 px-3 rounded-xl bg-cyan-600/30 hover:bg-cyan-600/40 border border-cyan-500/40 text-cyan-200 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+          >
+            🔄 SYNC FROM STEPUP / HEALTH
+          </button>
+          <button
+            type="button"
+            (click)="simulateTestSteps()"
+            class="py-2 px-3 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-zinc-300 text-xs transition-colors"
+            title="Simulate 25 walking strides"
+          >
+            +25
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- TAB 4: SLEEP & CIRCADIAN RHYTHM                                   -->
+    <!-- ================================================================= -->
+    <div *ngIf="activePillar() === 'sleep'" class="space-y-5">
+      <!-- Sleep Need Hero Card -->
+      <section class="whoop-surface p-6 rounded-3xl space-y-4 font-mono">
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-white font-bold uppercase tracking-wider">TONIGHT'S SLEEP NEED</span>
+          <span class="px-2.5 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/40 text-indigo-300 font-bold">
+            {{ formatMinutesToHours(tonightSleepNeedMinutes()) }}
+          </span>
+        </div>
+
+        <p class="text-[11px] text-zinc-400 font-sans">
+          Dynamically calibrated from physiological baseline (7h 30m) + today's accumulated strain demand (+{{ Math.round(strainScore() * 8.5) }}m) + habit penalties:
+        </p>
+
+        <div class="grid grid-cols-3 gap-2 text-center text-xs">
+          <div class="p-3 rounded-2xl bg-black/40 border border-white/[0.04]">
+            <div class="text-[9px] text-zinc-500 uppercase">BASE NEED</div>
+            <div class="text-white font-bold mt-0.5">7h 30m</div>
+          </div>
+          <div class="p-3 rounded-2xl bg-black/40 border border-white/[0.04]">
+            <div class="text-[9px] text-zinc-500 uppercase">STRAIN LOAD</div>
+            <div class="text-cyan-400 font-bold mt-0.5">+{{ Math.round(strainScore() * 8.5) }}m</div>
+          </div>
+          <div class="p-3 rounded-2xl bg-black/40 border border-white/[0.04]">
+            <div class="text-[9px] text-zinc-500 uppercase">HABIT DEBT</div>
+            <div class="text-rose-400 font-bold mt-0.5">+{{ todayLog()?.journalHabits?.drankAlcohol ? '35' : '0' }}m</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Circadian Timing Gates -->
+      <section class="whoop-surface p-5 rounded-3xl space-y-3 font-mono">
+        <div class="text-xs font-bold text-white uppercase tracking-wider">CIRCADIAN BIOLOGICAL GATES</div>
+
+        <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="text-[9px] text-zinc-500 uppercase font-semibold">MELATONIN ONSET GATE</span>
+            <span class="text-xs font-bold text-amber-300">{{ circadianMelatoninWindow() }}</span>
+          </div>
+          <p class="text-[11px] text-zinc-400 font-sans">
+            {{ todayLog()?.journalHabits?.viewedSunlight ? '✓ Circadian rhythm anchored by morning photons.' : '⚠ No morning sunlight logged. Endogenous melatonin release delayed ~60 mins.' }}
+          </p>
+        </div>
+
+        <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="text-[9px] text-zinc-500 uppercase font-semibold">CORE TEMPERATURE PEAK</span>
+            <span class="text-xs font-bold text-cyan-400">{{ peakAthleticWindow() }}</span>
+          </div>
+          <p class="text-[11px] text-zinc-400 font-sans">
+            Peak physical power, reaction velocity, and lowest cardiovascular resistance.
+          </p>
+        </div>
+      </section>
+
+      <!-- Sleep Efficiency Coefficient -->
+      <section class="whoop-surface p-5 rounded-3xl space-y-3 font-mono">
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-white font-bold uppercase tracking-wider">SLEEP RESTORATION COEFFICIENT</span>
+          <span class="text-sm font-bold text-indigo-300">{{ todayLog()?.advancedKPIs?.sleepEfficiencyCoefficient }}</span>
+        </div>
+        <p class="text-[11px] text-zinc-400 font-sans leading-relaxed">
+          Evaluates proportion of restorative slow-wave deep sleep and REM vs nocturnal sleeping heart rate (avg {{ todayLog()?.biometrics?.avgSleepHR }} bpm).
+        </p>
+      </section>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- TAB 5: SENSORS & HARDWARE DOCK                                    -->
+    <!-- ================================================================= -->
+    <div *ngIf="activePillar() === 'sensors'" class="space-y-4">
+      
+      <!-- Sensor Sub-Tabs Navigation -->
+      <div class="grid grid-cols-4 gap-1 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] text-[10px] font-mono tracking-wider font-semibold">
+        <button
+          type="button"
+          (click)="setHardwareTab('polar')"
+          class="py-1.5 rounded-xl transition-all text-center cursor-pointer"
+          [ngClass]="activeHardwareTab() === 'polar' ? 'bg-indigo-600/40 text-indigo-200 border border-indigo-500/40 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
+        >
+          POLAR H7
         </button>
 
         <button
           type="button"
-          (click)="toggleAlgorithmInspector()"
-          class="py-2 px-3 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700 text-slate-300 font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+          (click)="setHardwareTab('ppg')"
+          class="py-1.5 rounded-xl transition-all text-center cursor-pointer"
+          [ngClass]="activeHardwareTab() === 'ppg' ? 'bg-rose-600/40 text-rose-200 border border-rose-500/40 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
         >
-          <span>🔍 OPEN ALGORITHM</span>
+          CAMERA PPG
+        </button>
+
+        <button
+          type="button"
+          (click)="setHardwareTab('xiaomi')"
+          class="py-1.5 rounded-xl transition-all text-center cursor-pointer"
+          [ngClass]="activeHardwareTab() === 'xiaomi' ? 'bg-amber-600/40 text-amber-200 border border-amber-500/40 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
+        >
+          XIAOMI BAND
+        </button>
+
+        <button
+          type="button"
+          (click)="setHardwareTab('steps')"
+          class="py-1.5 rounded-xl transition-all text-center cursor-pointer"
+          [ngClass]="activeHardwareTab() === 'steps' ? 'bg-emerald-600/40 text-emerald-200 border border-emerald-500/40 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
+        >
+          STEP SYNC
         </button>
       </div>
-    </section>
 
-    <!-- DIAGNOSTIC BLOCK 2: 0-21 Logarithmic Strain Gauge vs Daily Target -->
-    <section class="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 shadow-md">
-      <div class="flex items-baseline justify-between mb-3 font-mono">
-        <div>
-          <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">DAY STRAIN</span>
-          <span class="text-xs text-slate-500 ml-1.5">(BANISTER TRIMP)</span>
-        </div>
-        <div class="text-right">
-          <span class="text-2xl font-bold text-cyan-400">{{ strainScore() }}</span>
-          <span class="text-xs text-slate-500"> / 21.0</span>
-        </div>
-      </div>
-
-      <!-- Logarithmic Strain Scale Track -->
-      <div class="relative w-full h-3 bg-slate-800 rounded-full overflow-hidden my-2">
-        <div
-          class="absolute top-0 bottom-0 bg-cyan-950/80 border-x border-cyan-500/40"
-          [style.left.%]="(targetStrain().min / 21.0) * 100"
-          [style.width.%]="((targetStrain().max - targetStrain().min) / 21.0) * 100"
-          title="Recommended Target Band"
-        ></div>
-
-        <div
-          class="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-teal-300 rounded-full transition-all duration-700 ease-out"
-          [style.width.%]="(strainScore() / 21.0) * 100"
-        ></div>
-      </div>
-
-      <!-- Scale Labels & Prescriptive Strain Target -->
-      <div class="flex justify-between items-center text-[10px] font-mono text-slate-400 mt-2">
-        <span>0.0 REST</span>
-        <div class="text-center font-semibold text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/50">
-          TARGET: {{ targetStrain().target }} ({{ targetStrain().min }} - {{ targetStrain().max }})
-        </div>
-        <span>21.0 MAX</span>
-      </div>
-    </section>
-
-    <!-- CIRCADIAN RHYTHM & SLEEP NEED PREDICTOR -->
-    <section class="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950/30 to-slate-950 border border-indigo-900/40 shadow-md space-y-3 font-mono">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <div class="w-2.5 h-2.5 rounded-full bg-indigo-400"></div>
-          <span class="text-[11px] uppercase tracking-wider font-semibold text-slate-300">
-            CIRCADIAN ENGINE // TONIGHT'S SLEEP NEED
-          </span>
-        </div>
-        <span class="text-[9px] px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/40 text-indigo-300 font-bold">
-          {{ formatMinutesToHours(tonightSleepNeedMinutes()) }} TARGET
-        </span>
-      </div>
-
-      <div class="grid grid-cols-2 gap-2 text-xs">
-        <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
-          <div class="text-[9px] text-slate-500 uppercase">MELATONIN ONSET GATE</div>
-          <div class="text-sm font-bold text-amber-300">{{ circadianMelatoninWindow() }}</div>
-          <div class="text-[9px] text-slate-400 font-sans">
-            {{ todayLog()?.journalHabits?.viewedSunlight ? 'Anchored by morning sunlight log.' : 'No sunlight logged. Expect circadian delay.' }}
+      <!-- SENSOR 1: POLAR H7/H10 BLUETOOTH LE ECG -->
+      <section *ngIf="activeHardwareTab() === 'polar'" class="whoop-surface p-5 rounded-3xl space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-2.5 h-2.5 rounded-full" [ngClass]="bleHR.isConnected() ? 'bg-indigo-400 shadow-[0_0_8px_#7B61FF] animate-pulse' : 'bg-zinc-600'"></div>
+            <span class="text-xs font-mono uppercase tracking-wider font-bold text-white">POLAR CHEST STRAP (0x180D)</span>
           </div>
-        </div>
 
-        <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
-          <div class="text-[9px] text-slate-500 uppercase">PEAK ATHLETIC WINDOW</div>
-          <div class="text-sm font-bold text-cyan-400">{{ peakAthleticWindow() }}</div>
-          <div class="text-[9px] text-slate-400 font-sans">Optimal core body temperature & reaction time.</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- POLAR CHEST STRAP & BLUETOOTH ECG TELEMETRY BLOCK -->
-    <section class="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950/30 to-slate-950 border border-indigo-900/40 shadow-lg relative overflow-hidden">
-      <div class="flex items-center justify-between mb-3">
-        <div class="flex items-center gap-2">
-          <!-- Bluetooth Status Indicator -->
-          <div
-            class="w-2.5 h-2.5 rounded-full"
-            [ngClass]="bleHR.isConnected() ? 'bg-indigo-400 animate-pulse' : (bleHR.isConnecting() ? 'bg-amber-400 animate-ping' : 'bg-slate-600')"
-          ></div>
-          <span class="text-[11px] font-mono uppercase tracking-wider font-semibold text-slate-300 flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5 text-indigo-400" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M14.24 12.015l5.225-5.225a1 1 0 0 0 0-1.414L14.77.681a1 1 0 0 0-1.707.707v7.586L8.777 4.688a1 1 0 1 0-1.414 1.414l5.353 5.353-5.353 5.354a1 1 0 1 0 1.414 1.414l4.286-4.287v7.587a1 1 0 0 0 1.707.707l4.695-4.695a1 1 0 0 0 0-1.414l-4.225-4.226zM15.063 4.51l2.485 2.485-2.485 2.486V4.51zm0 14.789v-4.971l2.485 2.485-2.485 2.486z"/>
-            </svg>
-            POLAR CHEST STRAP // DIRECT BLE ECG
-          </span>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <!-- Battery indicator if available -->
-          <span
-            *ngIf="bleHR.batteryLevel() !== null"
-            class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1"
-          >
-            🔋 {{ bleHR.batteryLevel() }}%
-          </span>
-
-          <span
-            class="text-[9px] font-mono px-2 py-0.5 rounded-full border"
-            [ngClass]="bleHR.isConnected() ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-300' : 'bg-slate-800/60 border-slate-700 text-slate-400'"
-          >
+          <span class="text-[9px] font-mono px-2 py-0.5 rounded-full border" [ngClass]="bleHR.isConnected() ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-300' : 'bg-white/[0.05] border-white/[0.08] text-zinc-400'">
             {{ bleHR.isConnected() ? (bleHR.deviceName() || 'CONNECTED') : (bleHR.isConnecting() ? 'SCANNING...' : 'DISCONNECTED') }}
           </span>
         </div>
-      </div>
 
-      <!-- Error / Browser Notice Banner -->
-      <div
-        *ngIf="bleHR.errorMessage()"
-        class="mb-3 p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/50 text-[11px] font-mono text-rose-300 flex items-center justify-between"
-      >
-        <span class="truncate mr-2">{{ bleHR.errorMessage() }}</span>
-        <button
-          type="button"
-          (click)="bleHR.errorMessage.set(null)"
-          class="shrink-0 px-2 py-0.5 rounded bg-rose-900/50 text-rose-200 text-[10px]"
-        >
-          DISMISS
-        </button>
-      </div>
+        <!-- Error Banner -->
+        <div *ngIf="bleHR.errorMessage()" class="p-3 rounded-2xl bg-rose-950/40 border border-rose-800/50 text-[11px] font-mono text-rose-300 flex items-center justify-between">
+          <span class="truncate mr-2">{{ bleHR.errorMessage() }}</span>
+          <button (click)="bleHR.errorMessage.set(null)" class="text-[10px] text-zinc-400 hover:text-white">✕</button>
+        </div>
 
-      <!-- State A: Disconnected State -->
-      <div *ngIf="!bleHR.isConnected()" class="space-y-3">
-        <p class="text-xs text-slate-400 font-sans leading-relaxed">
-          Connect your <strong class="text-slate-200">Polar H10 / H9</strong> directly via Bluetooth LE. Ingests millisecond-level R-R intervals (<span class="font-mono text-indigo-300">0x2A37</span>) directly into the local Vagus engine with zero external apps or accounts.
-        </p>
-
-        <button
-          type="button"
-          (click)="togglePolarConnection()"
-          [disabled]="bleHR.isConnecting()"
-          class="w-full py-3 px-4 rounded-xl font-mono text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white shadow-md active:scale-[0.99] disabled:opacity-50 cursor-pointer"
-        >
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M14.24 12.015l5.225-5.225a1 1 0 0 0 0-1.414L14.77.681a1 1 0 0 0-1.707.707v7.586L8.777 4.688a1 1 0 1 0-1.414 1.414l5.353 5.353-5.353 5.354a1 1 0 1 0 1.414 1.414l4.286-4.287v7.587a1 1 0 0 0 1.707.707l4.695-4.695a1 1 0 0 0 0-1.414l-4.225-4.226zM15.063 4.51l2.485 2.485-2.485 2.486V4.51zm0 14.789v-4.971l2.485 2.485-2.485 2.486z"/>
-          </svg>
-          <span>{{ bleHR.isConnecting() ? 'SCANNING FOR POLAR STRAP...' : 'PAIR POLAR CHEST STRAP' }}</span>
-        </button>
-      </div>
-
-      <!-- State B: Connected State -->
-      <div *ngIf="bleHR.isConnected()" class="space-y-4">
-        <!-- Live Cardiac HUD -->
-        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800">
-          <div class="flex items-center gap-3">
-            <div class="cardiac-beat text-2xl">❤️</div>
-            <div>
-              <div class="flex items-baseline gap-1.5">
-                <span class="text-3xl font-mono font-bold text-white">{{ bleHR.liveBpm() }}</span>
-                <span class="text-xs font-mono text-slate-400">BPM</span>
-              </div>
-              <div class="text-[10px] font-mono text-slate-500">
-                LAST R-R: <span class="text-indigo-300 font-semibold">{{ bleHR.lastRRIntervalMs() ? (bleHR.lastRRIntervalMs() + ' ms') : '--' }}</span>
-              </div>
-            </div>
-          </div>
+        <!-- Disconnected State -->
+        <div *ngIf="!bleHR.isConnected()" class="space-y-3">
+          <p class="text-xs text-zinc-400 font-sans leading-relaxed">
+            Direct millisecond R-R intervals (<span class="font-mono text-indigo-300">0x2A37</span>) from your Polar H7 or H10 without third-party cloud accounts.
+          </p>
 
           <button
             type="button"
             (click)="togglePolarConnection()"
-            class="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-rose-400 text-[10px] font-mono transition-colors"
+            [disabled]="bleHR.isConnecting()"
+            class="w-full py-3 px-4 rounded-2xl font-mono text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white shadow-lg shadow-indigo-950/50 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
           >
-            DISCONNECT
+            {{ bleHR.isConnecting() ? 'SCANNING FOR POLAR STRAP...' : 'PAIR POLAR CHEST STRAP' }}
           </button>
         </div>
 
-        <!-- 1. Morning Readiness Scan Subcard -->
-        <div class="p-3.5 rounded-xl bg-indigo-950/20 border border-indigo-900/50 space-y-3">
-          <div class="flex items-center justify-between font-mono">
-            <div>
-              <div class="text-xs font-bold text-indigo-300 uppercase tracking-wide">MORNING READINESS SCAN</div>
-              <div class="text-[10px] text-slate-400">60-second resting ECG to record clinical RMSSD & Recovery %</div>
+        <!-- Connected State: Live Telemetry & Scans -->
+        <div *ngIf="bleHR.isConnected()" class="space-y-4">
+          <!-- Cardiac Live HUD -->
+          <div class="flex items-center justify-between p-3.5 rounded-2xl bg-black/50 border border-white/[0.06]">
+            <div class="flex items-center gap-3">
+              <span class="cardiac-beat text-2xl">❤️</span>
+              <div>
+                <div class="flex items-baseline gap-1.5">
+                  <span class="text-3xl font-mono font-black text-white">{{ bleHR.liveBpm() }}</span>
+                  <span class="text-xs font-mono text-zinc-500">BPM</span>
+                </div>
+                <div class="text-[10px] font-mono text-zinc-400">
+                  LAST R-R: <span class="text-indigo-300 font-bold">{{ bleHR.lastRRIntervalMs() ? (bleHR.lastRRIntervalMs() + ' ms') : '--' }}</span>
+                </div>
+              </div>
             </div>
-            <div *ngIf="bleHR.scanSession().isActive" class="text-sm font-bold text-cyan-400">
-              {{ bleHR.scanSession().remainingSeconds }}s REMAINING
-            </div>
-          </div>
 
-          <!-- While Scan is INACTIVE -->
-          <div *ngIf="!bleHR.scanSession().isActive" class="flex gap-2">
             <button
               type="button"
-              (click)="startMorningReadinessScan(60)"
-              class="flex-1 py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-semibold uppercase tracking-wider transition-all"
+              (click)="togglePolarConnection()"
+              class="px-2.5 py-1 rounded-xl bg-white/[0.06] hover:bg-rose-500/20 text-zinc-400 hover:text-rose-300 text-[10px] font-mono border border-white/[0.08] transition-colors"
             >
-              START 60s SCAN
-            </button>
-            <button
-              type="button"
-              (click)="startMorningReadinessScan(120)"
-              class="py-2 px-3 rounded-lg bg-indigo-950/60 hover:bg-indigo-900/60 border border-indigo-800 text-indigo-200 font-mono text-xs transition-colors"
-            >
-              120s SCAN
+              DISCONNECT
             </button>
           </div>
 
-          <!-- While Scan IS ACTIVE -->
-          <div *ngIf="bleHR.scanSession().isActive" class="space-y-3 pt-1">
-            <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-              <div
-                class="h-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-emerald-400 transition-all duration-1000 ease-linear"
-                [style.width.%]="((bleHR.scanSession().durationSeconds - bleHR.scanSession().remainingSeconds) / bleHR.scanSession().durationSeconds) * 100"
-              ></div>
-            </div>
-
-            <div class="grid grid-cols-3 gap-2 font-mono text-center text-xs">
-              <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
-                <div class="text-[9px] text-slate-400 uppercase">BEATS</div>
-                <div class="font-bold text-slate-100 mt-0.5">{{ bleHR.scanSession().capturedRRIntervals.length }}</div>
+          <!-- Morning Readiness Scan -->
+          <div class="p-4 rounded-2xl bg-indigo-950/20 border border-indigo-900/40 space-y-3 font-mono">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-xs font-bold text-indigo-300 uppercase">MORNING READINESS SCAN</div>
+                <div class="text-[10px] text-zinc-400">Calculates clinical resting RMSSD & Recovery %</div>
               </div>
-              <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
-                <div class="text-[9px] text-slate-400 uppercase">LIVE RMSSD</div>
-                <div class="font-bold text-emerald-400 mt-0.5">{{ bleHR.scanSession().currentRMSSD }} ms</div>
-              </div>
-              <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
-                <div class="text-[9px] text-slate-400 uppercase">MEAN RHR</div>
-                <div class="font-bold text-cyan-400 mt-0.5">{{ bleHR.scanSession().meanBpm }} bpm</div>
+              <div *ngIf="bleHR.scanSession().isActive" class="text-xs font-bold text-cyan-400 animate-pulse">
+                {{ bleHR.scanSession().remainingSeconds }}s LEFT
               </div>
             </div>
 
-            <div class="p-2 rounded-lg bg-indigo-900/30 border border-indigo-800/40 text-center font-mono text-[10px] text-indigo-300">
-              🌬️ Inhale 4s ... Exhale 4s. Stay still and relaxed.
-            </div>
-
-            <div class="flex gap-2">
+            <!-- Inactive -->
+            <div *ngIf="!bleHR.scanSession().isActive" class="flex gap-2 pt-1">
               <button
                 type="button"
-                (click)="stopMorningReadinessScan(true)"
-                class="flex-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-semibold uppercase tracking-wider transition-colors"
+                (click)="startMorningReadinessScan(60)"
+                class="flex-1 py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
               >
-                COMPLETE & SAVE NOW
+                START 60s SCAN
               </button>
               <button
                 type="button"
-                (click)="stopMorningReadinessScan(false)"
-                class="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 font-mono text-xs transition-colors"
+                (click)="startMorningReadinessScan(120)"
+                class="py-2.5 px-3 rounded-xl bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-800 text-indigo-300 text-xs transition-colors cursor-pointer"
               >
-                CANCEL
+                120s
               </button>
             </div>
+
+            <!-- Active Scan -->
+            <div *ngIf="bleHR.scanSession().isActive" class="space-y-3 pt-1">
+              <div class="w-full h-2 bg-black/60 rounded-full overflow-hidden">
+                <div
+                  class="h-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-[#00F5A0] transition-all duration-1000 ease-linear"
+                  [style.width.%]="((bleHR.scanSession().durationSeconds - bleHR.scanSession().remainingSeconds) / bleHR.scanSession().durationSeconds) * 100"
+                ></div>
+              </div>
+
+              <div class="grid grid-cols-3 gap-2 text-center text-xs">
+                <div class="p-2 rounded-xl bg-black/50 border border-white/[0.04]">
+                  <div class="text-[9px] text-zinc-500 uppercase">BEATS</div>
+                  <div class="font-bold text-white mt-0.5">{{ bleHR.scanSession().capturedRRIntervals.length }}</div>
+                </div>
+                <div class="p-2 rounded-xl bg-black/50 border border-white/[0.04]">
+                  <div class="text-[9px] text-zinc-500 uppercase">RMSSD</div>
+                  <div class="font-bold text-[#00F5A0] mt-0.5">{{ bleHR.scanSession().currentRMSSD }} ms</div>
+                </div>
+                <div class="p-2 rounded-xl bg-black/50 border border-white/[0.04]">
+                  <div class="text-[9px] text-zinc-500 uppercase">RHR</div>
+                  <div class="font-bold text-cyan-400 mt-0.5">{{ bleHR.scanSession().meanBpm }} bpm</div>
+                </div>
+              </div>
+
+              <div class="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  (click)="stopMorningReadinessScan(true)"
+                  class="flex-1 py-2 px-3 rounded-xl bg-[#00F5A0] hover:bg-[#00D284] text-black font-bold uppercase tracking-wider text-xs transition-colors cursor-pointer"
+                >
+                  SAVE & COMMIT
+                </button>
+                <button
+                  type="button"
+                  (click)="stopMorningReadinessScan(false)"
+                  class="py-2 px-3 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-zinc-400 text-xs transition-colors cursor-pointer"
+                >
+                  CANCEL
+                </button>
+              </div>
+            </div>
           </div>
         </div>
+      </section>
 
-        <!-- 2. Live Workout Strain Subcard -->
-        <div class="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
-          <div class="flex items-center justify-between font-mono">
-            <div>
-              <div class="text-xs font-bold text-cyan-300 uppercase tracking-wide">WORKOUT STRAIN TRACKER</div>
-              <div class="text-[10px] text-slate-400">Stream cardiac load to accumulate Banister TRIMP in real time</div>
+      <!-- SENSOR 2: PHONE CAMERA OPTICAL PPG (ZERO WEARABLES REQUIRED) -->
+      <section *ngIf="activeHardwareTab() === 'ppg'" class="whoop-surface p-5 rounded-3xl space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-2.5 h-2.5 rounded-full" [ngClass]="ppg.scanState().isActive ? 'bg-rose-400 animate-pulse' : 'bg-zinc-600'"></div>
+            <span class="text-xs font-mono uppercase tracking-wider font-bold text-white">CAMERA OPTICAL PPG SCAN</span>
+          </div>
+
+          <span class="text-[9px] font-mono px-2 py-0.5 rounded-full border" [ngClass]="ppg.scanState().isActive ? (ppg.scanState().isFingerDetected ? 'bg-[#00F5A0]/10 border-[#00F5A0]/40 text-[#00F5A0]' : 'bg-rose-500/10 border-rose-500/40 text-rose-300') : 'bg-white/[0.05] border-white/[0.08] text-zinc-400'">
+            {{ ppg.scanState().isActive ? (ppg.scanState().isFingerDetected ? 'PULSE LOCKED' : 'ALIGN FINGER') : 'STANDBY' }}
+          </span>
+        </div>
+
+        <div *ngIf="!ppg.scanState().isActive" class="space-y-3">
+          <p class="text-xs text-zinc-400 font-sans leading-relaxed">
+            Zero hardware required. Gently cover your phone's rear camera lens and flashlight with your index finger. Vagus measures capillary blood absorption at 30 fps to compute your <strong class="text-zinc-200">Resting HR</strong> and <strong class="text-zinc-200">RMSSD</strong>.
+          </p>
+
+          <button
+            type="button"
+            (click)="startCameraPpg(45)"
+            class="w-full py-3 px-4 rounded-2xl font-mono text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-rose-600 via-rose-500 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white shadow-lg shadow-rose-950/50 active:scale-[0.99] transition-all cursor-pointer"
+          >
+            📸 START CAMERA PPG SCAN (45 SEC)
+          </button>
+        </div>
+
+        <div *ngIf="ppg.scanState().isActive" class="space-y-3 font-mono">
+          <div class="p-2.5 rounded-xl border text-center text-xs" [ngClass]="ppg.scanState().isFingerDetected ? 'bg-[#00F5A0]/10 border-[#00F5A0]/40 text-[#00F5A0]' : 'bg-rose-950/40 border-rose-800/60 text-rose-300'">
+            {{ ppg.scanState().statusMessage }}
+          </div>
+
+          <div class="w-full h-2 bg-black/60 rounded-full overflow-hidden">
+            <div
+              class="h-full bg-gradient-to-r from-rose-500 via-amber-400 to-[#00F5A0] transition-all duration-1000 ease-linear"
+              [style.width.%]="((ppg.scanState().durationSeconds - ppg.scanState().remainingSeconds) / ppg.scanState().durationSeconds) * 100"
+            ></div>
+          </div>
+
+          <div class="grid grid-cols-4 gap-2 text-center text-xs">
+            <div class="p-2 rounded-xl bg-black/50 border border-white/[0.04]">
+              <div class="text-[9px] text-zinc-500 uppercase">TIME</div>
+              <div class="font-bold text-amber-300 mt-0.5">{{ ppg.scanState().remainingSeconds }}s</div>
             </div>
-            <div *ngIf="bleHR.workoutSession().isActive" class="text-xs font-bold text-emerald-400 font-mono">
-              RECORDING
+            <div class="p-2 rounded-xl bg-black/50 border border-white/[0.04]">
+              <div class="text-[9px] text-zinc-500 uppercase">BEATS</div>
+              <div class="font-bold text-white mt-0.5">{{ ppg.scanState().capturedIBIs.length }}</div>
+            </div>
+            <div class="p-2 rounded-xl bg-black/50 border border-white/[0.04]">
+              <div class="text-[9px] text-zinc-500 uppercase">BPM</div>
+              <div class="font-bold text-rose-400 mt-0.5">{{ ppg.scanState().liveBpm || '--' }}</div>
+            </div>
+            <div class="p-2 rounded-xl bg-black/50 border border-white/[0.04]">
+              <div class="text-[9px] text-zinc-500 uppercase">RMSSD</div>
+              <div class="font-bold text-[#00F5A0] mt-0.5">{{ ppg.scanState().currentRMSSD }} ms</div>
             </div>
           </div>
 
-          <div *ngIf="!bleHR.workoutSession().isActive">
+          <div class="flex gap-2 pt-1">
             <button
               type="button"
-              (click)="toggleWorkoutTracker()"
-              class="w-full py-2 px-3 rounded-lg bg-cyan-600/30 hover:bg-cyan-600/40 border border-cyan-500/40 text-cyan-200 font-mono text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer"
+              (click)="stopCameraPpg(true)"
+              [disabled]="ppg.scanState().capturedIBIs.length < 5"
+              class="flex-1 py-2 px-3 rounded-xl bg-[#00F5A0] hover:bg-[#00D284] disabled:opacity-40 text-black font-bold uppercase tracking-wider text-xs transition-colors cursor-pointer"
             >
-              START WORKOUT SESSION
+              SAVE SCAN
+            </button>
+            <button
+              type="button"
+              (click)="stopCameraPpg(false)"
+              class="py-2 px-3 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-zinc-400 text-xs transition-colors cursor-pointer"
+            >
+              CANCEL
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SENSOR 3: XIAOMI SMART BAND 8/9/10/11 INTEGRATION -->
+      <section *ngIf="activeHardwareTab() === 'xiaomi'" class="whoop-surface p-5 rounded-3xl space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_#FFB800]"></div>
+            <span class="text-xs font-mono uppercase tracking-wider font-bold text-white">XIAOMI SMART BAND HUB</span>
+          </div>
+          <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300">
+            $35 WHOOP SETUP
+          </span>
+        </div>
+
+        <div class="space-y-3 font-mono text-xs">
+          <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] space-y-1.5 font-sans">
+            <div class="text-xs font-mono font-bold text-amber-300 uppercase">1. BLE Broadcast Mode</div>
+            <p class="text-[11px] text-zinc-400 leading-relaxed">
+              In <strong class="text-zinc-200">Mi Fitness</strong>: Go to <span class="font-mono text-zinc-300">Device &rarr; Band Settings &rarr; Heart Rate Sharing / Broadcast</span> and turn it <strong>ON</strong>. Then switch to the <strong>POLAR H7</strong> tab and tap <strong>PAIR</strong> to stream live heart rate!
+            </p>
+          </div>
+
+          <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] space-y-2 font-sans">
+            <div class="flex items-center justify-between font-mono">
+              <span class="text-xs font-bold text-amber-300 uppercase">2. Ingest Mi Fitness JSON</span>
+              <span *ngIf="xiaomi.isImporting()" class="text-[10px] text-amber-400 animate-pulse">IMPORTING...</span>
+            </div>
+            <p class="text-[11px] text-zinc-400">
+              Upload exported sleep & biometrics JSON from Mi Fitness or Gadgetbridge to automatically ingest Deep/REM sleep stages:
+            </p>
+
+            <label class="block mt-2 font-mono">
+              <input
+                type="file"
+                accept=".json"
+                (change)="onXiaomiFileSelected($event)"
+                class="block w-full text-xs text-zinc-400 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-500/20 file:text-amber-300 hover:file:bg-amber-500/30 cursor-pointer"
+              />
+            </label>
+
+            <!-- Success Summary -->
+            <div *ngIf="xiaomi.lastImport()" class="mt-2 p-3 rounded-xl bg-[#00F5A0]/10 border border-[#00F5A0]/30 font-mono text-xs text-[#00F5A0] space-y-1">
+              <div class="font-bold text-[11px] uppercase">✓ Ingested Xiaomi Biometrics ({{ xiaomi.lastImport()?.date }})</div>
+              <div class="grid grid-cols-3 gap-2 pt-1 text-[10px] text-zinc-300">
+                <div>SLEEP: <strong class="text-white">{{ formatMinutesToHours(xiaomi.lastImport()?.totalSleepMin || 0) }}</strong></div>
+                <div>DEEP/REM: <strong class="text-white">{{ xiaomi.lastImport()?.deepSleepMin }}m / {{ xiaomi.lastImport()?.remSleepMin }}m</strong></div>
+                <div>RECOVERY: <strong class="text-[#00F5A0]">{{ xiaomi.lastImport()?.calculatedRecovery }}%</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SENSOR 4: STEP SYNC & PEDOMETER CONFIG -->
+      <section *ngIf="activeHardwareTab() === 'steps'" class="whoop-surface p-5 rounded-3xl space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-2.5 h-2.5 rounded-full" [ngClass]="pedometer.isTracking() ? 'bg-[#00F5A0] animate-pulse' : 'bg-zinc-600'"></div>
+            <span class="text-xs font-mono uppercase tracking-wider font-bold text-white">PEDOMETER ENGINE</span>
+          </div>
+          <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-white/[0.05] border border-white/[0.08] text-zinc-400">
+            {{ pedometer.activeEngine() }}
+          </span>
+        </div>
+
+        <div class="space-y-3 font-mono text-xs">
+          <!-- iOS Motion Button if needed -->
+          <div *ngIf="pedometer.isIOS && pedometer.permissionState() === 'PROMPT'" class="p-3 rounded-2xl bg-cyan-950/40 border border-cyan-800/50 flex items-center justify-between">
+            <span class="text-[11px] text-cyan-200 font-sans">Authorize Apple CoreMotion for automatic background step tracking</span>
+            <button (click)="authorizeIOSMotion()" class="px-2.5 py-1 rounded-xl bg-cyan-500 text-black font-bold uppercase hover:bg-cyan-400 transition-colors">
+              AUTHORIZE
             </button>
           </div>
 
-          <div *ngIf="bleHR.workoutSession().isActive" class="space-y-3">
-            <div class="grid grid-cols-3 gap-2 font-mono text-center text-xs">
-              <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
-                <div class="text-[9px] text-slate-400 uppercase">DURATION</div>
-                <div class="font-bold text-slate-100 mt-0.5">{{ formatMinutesToHours(bleHR.workoutSession().elapsedSeconds / 60) }}</div>
-              </div>
-              <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
-                <div class="text-[9px] text-slate-400 uppercase">MAX HR</div>
-                <div class="font-bold text-rose-400 mt-0.5">{{ bleHR.workoutSession().maxBpm }} bpm</div>
-              </div>
-              <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
-                <div class="text-[9px] text-slate-400 uppercase">STRAIN ADDED</div>
-                <div class="font-bold text-cyan-400 mt-0.5">+{{ bleHR.workoutSession().accumulatedStrain }}</div>
-              </div>
+          <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] space-y-2">
+            <div class="flex items-baseline justify-between">
+              <span class="text-zinc-500 uppercase">TODAY'S FOOTSTEPS</span>
+              <span class="text-2xl font-black text-white font-sans">{{ liveSteps() | number }}</span>
             </div>
+            <div class="text-[10px] text-zinc-500">{{ pedometer.statusMessage() }}</div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              (click)="togglePhoneSteps()"
+              class="py-2.5 px-3 rounded-xl border font-bold uppercase tracking-wider transition-all cursor-pointer"
+              [ngClass]="pedometer.isTracking() ? 'bg-white/[0.06] border-white/[0.1] text-zinc-300' : 'bg-[#00F5A0]/20 border-[#00F5A0]/40 text-[#00F5A0]'"
+            >
+              {{ pedometer.isTracking() ? 'PAUSE AUTO-SYNC' : 'START AUTO-SYNC' }}
+            </button>
 
             <button
               type="button"
-              (click)="toggleWorkoutTracker()"
-              class="w-full py-2 px-3 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-mono text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer"
+              (click)="openStepSyncModal()"
+              class="py-2.5 px-3 rounded-xl bg-cyan-600/30 hover:bg-cyan-600/40 border border-cyan-500/40 text-cyan-200 font-bold uppercase tracking-wider transition-colors cursor-pointer"
             >
-              FINISH WORKOUT & COMMIT STRAIN
+              SYNC STEPUP / HEALTH
             </button>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- PHONE CAMERA OPTICAL PPG (ZERO WEARABLE RECOVERY SCAN) -->
-    <section class="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-rose-950/20 to-slate-950 border border-rose-900/30 shadow-lg relative overflow-hidden">
-      <div class="flex items-center justify-between mb-3">
-        <div class="flex items-center gap-2">
-          <div
-            class="w-2.5 h-2.5 rounded-full"
-            [ngClass]="ppg.scanState().isActive ? (ppg.scanState().isFingerDetected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500 animate-ping') : 'bg-slate-600'"
-          ></div>
-          <span class="text-[11px] font-mono uppercase tracking-wider font-semibold text-slate-300 flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            PHONE CAMERA PPG // ZERO-HARDWARE SCAN
-          </span>
-        </div>
-
-        <span
-          class="text-[9px] font-mono px-2 py-0.5 rounded-full border"
-          [ngClass]="ppg.scanState().isActive ? (ppg.scanState().isFingerDetected ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300' : 'bg-rose-500/10 border-rose-500/40 text-rose-300') : 'bg-slate-800/60 border-slate-700 text-slate-400'"
-        >
-          {{ ppg.scanState().isActive ? (ppg.scanState().isFingerDetected ? 'PULSE LOCKED' : 'ALIGN FINGER') : 'STANDBY' }}
-        </span>
-      </div>
-
-      <!-- Error Banner -->
-      <div
-        *ngIf="ppg.errorMessage()"
-        class="mb-3 p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/50 text-[11px] font-mono text-rose-300 flex items-center justify-between"
-      >
-        <span class="truncate mr-2">{{ ppg.errorMessage() }}</span>
-        <button
-          type="button"
-          (click)="ppg.errorMessage.set(null)"
-          class="shrink-0 px-2 py-0.5 rounded bg-rose-900/50 text-rose-200 text-[10px]"
-        >
-          DISMISS
+      <!-- Testing & Calibration Tools Pill -->
+      <div class="pt-2 flex items-center justify-between text-[10px] font-mono text-zinc-500 px-1">
+        <button (click)="resetAllData()" class="hover:text-rose-400 transition-colors">
+          WIPE SIMULATED STATE
+        </button>
+        <button (click)="seedInitialData()" [disabled]="isSeeding()" class="hover:text-zinc-300 transition-colors">
+          {{ isSeeding() ? 'SEEDING...' : 'RESEED 30D BENCHMARKS' }}
         </button>
       </div>
-
-      <!-- Inactive State -->
-      <div *ngIf="!ppg.scanState().isActive" class="space-y-3">
-        <p class="text-xs text-slate-400 font-sans leading-relaxed">
-          No hardware band needed. Place your index finger gently over your phone's rear camera lens and flashlight. Vagus measures capillary blood volume changes at 30 fps to compute your <strong class="text-slate-200">Resting HR</strong> and <strong class="text-slate-200">RMSSD</strong>.
-        </p>
-
-        <button
-          type="button"
-          (click)="startCameraPpg(45)"
-          class="w-full py-2.5 px-4 rounded-xl font-mono text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-rose-600 via-rose-500 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white shadow-md active:scale-[0.99] cursor-pointer"
-        >
-          <span>📸 START CAMERA PPG SCAN (45 SEC)</span>
-        </button>
-      </div>
-
-      <!-- Active Scan State -->
-      <div *ngIf="ppg.scanState().isActive" class="space-y-3">
-        <!-- Status instruction -->
-        <div
-          class="p-2.5 rounded-xl border text-center font-mono text-xs transition-colors"
-          [ngClass]="ppg.scanState().isFingerDetected ? 'bg-emerald-950/30 border-emerald-800/50 text-emerald-300' : 'bg-rose-950/40 border-rose-800/60 text-rose-300'"
-        >
-          {{ ppg.scanState().statusMessage }}
-        </div>
-
-        <!-- Progress bar -->
-        <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-          <div
-            class="h-full bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-400 transition-all duration-1000 ease-linear"
-            [style.width.%]="((ppg.scanState().durationSeconds - ppg.scanState().remainingSeconds) / ppg.scanState().durationSeconds) * 100"
-          ></div>
-        </div>
-
-        <!-- Real-time metrics grid -->
-        <div class="grid grid-cols-4 gap-2 font-mono text-center text-xs">
-          <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
-            <div class="text-[9px] text-slate-400 uppercase">REMAINING</div>
-            <div class="font-bold text-amber-300 mt-0.5">{{ ppg.scanState().remainingSeconds }}s</div>
-          </div>
-          <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
-            <div class="text-[9px] text-slate-400 uppercase">BEATS</div>
-            <div class="font-bold text-slate-100 mt-0.5">{{ ppg.scanState().capturedIBIs.length }}</div>
-          </div>
-          <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
-            <div class="text-[9px] text-slate-400 uppercase">LIVE BPM</div>
-            <div class="font-bold text-rose-400 mt-0.5">{{ ppg.scanState().liveBpm || '--' }}</div>
-          </div>
-          <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
-            <div class="text-[9px] text-slate-400 uppercase">RMSSD</div>
-            <div class="font-bold text-emerald-400 mt-0.5">{{ ppg.scanState().currentRMSSD }} ms</div>
-          </div>
-        </div>
-
-        <div class="flex gap-2">
-          <button
-            type="button"
-            (click)="stopCameraPpg(true)"
-            [disabled]="ppg.scanState().capturedIBIs.length < 5"
-            class="flex-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-mono text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer"
-          >
-            COMPLETE & COMMIT
-          </button>
-          <button
-            type="button"
-            (click)="stopCameraPpg(false)"
-            class="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 font-mono text-xs transition-colors cursor-pointer"
-          >
-            CANCEL
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- XIAOMI SMART BAND 8 / 9 INTEGRATION HUB -->
-    <section class="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-amber-950/20 to-slate-950 border border-amber-900/30 shadow-lg relative overflow-hidden">
-      <div class="flex items-center justify-between mb-3">
-        <div class="flex items-center gap-2">
-          <div class="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
-          <span class="text-[11px] font-mono uppercase tracking-wider font-semibold text-slate-300 flex items-center gap-1.5">
-            XIAOMI SMART BAND 8 / 9 // HUB
-          </span>
-        </div>
-
-        <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300">
-          $35 WHOOP SETUP
-        </span>
-      </div>
-
-      <div class="space-y-4">
-        <!-- Method 1: BLE Broadcast Mode -->
-        <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-          <div class="text-xs font-bold font-mono text-amber-300 uppercase">
-            1. LIVE BLUETOOTH BROADCAST MODE
-          </div>
-          <p class="text-xs text-slate-400 font-sans leading-relaxed">
-            In the <strong class="text-slate-200">Mi Fitness</strong> app: Go to <span class="font-mono text-slate-300 text-[11px]">Device &rarr; Band Settings &rarr; Heart Rate Sharing / Broadcast</span> and toggle it <strong>ON</strong>. Then tap <strong class="text-indigo-300">Pair Polar / BLE</strong> above to stream live Xiaomi HR into Vagus!
-          </p>
-        </div>
-
-        <!-- Method 2: Mi Fitness / Gadgetbridge JSON Import -->
-        <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-          <div class="flex items-center justify-between">
-            <div class="text-xs font-bold font-mono text-amber-300 uppercase">
-              2. IMPORT SLEEP & BIOMETRICS JSON
-            </div>
-            <span *ngIf="xiaomi.isImporting()" class="text-[10px] font-mono text-amber-400 animate-pulse">
-              IMPORTING...
-            </span>
-          </div>
-
-          <p class="text-xs text-slate-400 font-sans leading-relaxed">
-            Upload your exported <strong class="text-slate-200">Mi Fitness</strong> or <strong class="text-slate-200">Gadgetbridge</strong> JSON file to automatically ingest nocturnal Deep/REM sleep stages, resting HR, and steps:
-          </p>
-
-          <label class="block mt-2">
-            <input
-              type="file"
-              accept=".json"
-              (change)="onXiaomiFileSelected($event)"
-              class="block w-full text-xs font-mono text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-amber-500/20 file:text-amber-300 hover:file:bg-amber-500/30 file:cursor-pointer cursor-pointer"
-            />
-          </label>
-
-          <!-- Import Error -->
-          <div *ngIf="xiaomi.importError()" class="p-2 rounded bg-rose-950/40 border border-rose-800/40 text-[10px] font-mono text-rose-300">
-            {{ xiaomi.importError() }}
-          </div>
-
-          <!-- Successful Import Summary -->
-          <div *ngIf="xiaomi.lastImport()" class="mt-2 p-3 rounded-xl bg-emerald-950/30 border border-emerald-800/40 font-mono text-xs text-emerald-300 space-y-1">
-            <div class="font-bold text-[11px] uppercase text-emerald-200">
-              ✓ Successfully Ingested Xiaomi Biometrics ({{ xiaomi.lastImport()?.date }})
-            </div>
-            <div class="grid grid-cols-3 gap-2 pt-1 text-[10px] text-slate-300">
-              <div>SLEEP: <span class="font-bold text-white">{{ formatMinutesToHours(xiaomi.lastImport()?.totalSleepMin || 0) }}</span></div>
-              <div>DEEP/REM: <span class="font-bold text-white">{{ xiaomi.lastImport()?.deepSleepMin }}m / {{ xiaomi.lastImport()?.remSleepMin }}m</span></div>
-              <div>RECOVERY: <span class="font-bold text-emerald-400">{{ xiaomi.lastImport()?.calculatedRecovery }}%</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- LIVE DUAL-OS STEP TELEMETRY BLOCK (AUTOMATIC IOS & ANDROID) -->
-    <section class="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800/90 shadow-md">
-      <div class="flex items-center justify-between mb-3">
-        <div class="flex items-center gap-2">
-          <div
-            class="w-2 h-2 rounded-full"
-            [ngClass]="pedometer.isTracking() ? 'bg-emerald-400 animate-ping' : 'bg-slate-600'"
-          ></div>
-          <span class="text-[11px] font-mono uppercase tracking-wider font-semibold text-slate-300">
-            AUTO STEPS // IOS & ANDROID
-          </span>
-        </div>
-
-        <span
-          class="text-[9px] font-mono px-2 py-0.5 rounded-full border"
-          [ngClass]="pedometer.isTracking() ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-slate-800/50 border-slate-700 text-slate-400'"
-        >
-          {{ pedometer.activeEngine() }}
-        </span>
-      </div>
-
-      <!-- iOS Safari Motion Access Authorization Banner if needed -->
-      <div
-        *ngIf="pedometer.isIOS && pedometer.permissionState() === 'PROMPT'"
-        class="mb-3 p-3 rounded-xl bg-cyan-950/40 border border-cyan-800/50 flex items-center justify-between"
-      >
-        <div class="text-[11px] font-mono text-cyan-200">
-          Authorize Apple CoreMotion for automatic background step tracking
-        </div>
-        <button
-          type="button"
-          (click)="authorizeIOSMotion()"
-          class="ml-2 px-2.5 py-1 rounded bg-cyan-500 text-slate-950 font-mono text-[10px] font-bold uppercase hover:bg-cyan-400 transition-colors shrink-0"
-        >
-          AUTHORIZE
-        </button>
-      </div>
-
-      <div class="flex items-baseline justify-between my-2">
-        <div>
-          <span class="text-4xl font-mono font-bold tracking-tight text-slate-100">
-            {{ liveSteps() | number }}
-          </span>
-          <span class="text-xs font-mono text-slate-400 ml-1.5">/ {{ stepGoal() | number }} STEPS</span>
-        </div>
-        <div class="text-right">
-          <span class="text-sm font-mono font-bold text-emerald-400">{{ stepProgressPercent() }}%</span>
-        </div>
-      </div>
-
-      <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden my-2">
-        <div
-          class="h-full bg-gradient-to-r from-emerald-500 to-teal-300 rounded-full transition-all duration-500 ease-out"
-          [style.width.%]="stepProgressPercent()"
-        ></div>
-      </div>
-
-      <div class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-800/60 font-mono text-center">
-        <div>
-          <div class="text-[9px] text-slate-500 uppercase">CADENCE</div>
-          <div class="text-xs font-semibold text-slate-200 mt-0.5">
-            {{ pedometer.activeCadence() }} <span class="text-[9px] text-slate-500 font-normal">spm</span>
-          </div>
-        </div>
-        <div class="border-x border-slate-800/60">
-          <div class="text-[9px] text-slate-500 uppercase">DISTANCE</div>
-          <div class="text-xs font-semibold text-slate-200 mt-0.5">
-            {{ estimatedDistanceKm() }} <span class="text-[9px] text-slate-500 font-normal">km</span>
-          </div>
-        </div>
-        <div>
-          <div class="text-[9px] text-slate-500 uppercase">ACTIVE BURN</div>
-          <div class="text-xs font-semibold text-slate-200 mt-0.5">
-            {{ estimatedActiveCalories() }} <span class="text-[9px] text-slate-500 font-normal">kcal</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="flex gap-2 mt-4">
-        <button
-          type="button"
-          (click)="togglePhoneSteps()"
-          class="flex-1 py-2 px-3 rounded-xl font-mono text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
-          [ngClass]="pedometer.isTracking() ? 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200' : 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30'"
-        >
-          <span>{{ pedometer.isTracking() ? '● AUTO-SYNC ACTIVE' : '▶ RESUME AUTO-SYNC' }}</span>
-        </button>
-
-        <button
-          type="button"
-          (click)="openStepSyncModal()"
-          class="py-2 px-3 rounded-xl bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/40 text-cyan-200 font-mono text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-          title="Sync step count from StepUp, Apple Health, or Google Fit"
-        >
-          <span>🔄 SYNC STEPS</span>
-        </button>
-
-        <button
-          type="button"
-          (click)="simulateTestSteps()"
-          class="py-2 px-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 font-mono text-[11px] text-slate-300 transition-colors"
-          title="Simulate 25 walking strides for test verification"
-        >
-          +25
-        </button>
-      </div>
-
-      <div class="mt-2.5 text-[10px] font-mono text-slate-500 text-center truncate">
-        {{ pedometer.statusMessage() }}
-      </div>
-    </section>
-
-    <!-- DIAGNOSTIC BLOCK 3: Advanced KPIs Grid with Micro-Explanations -->
-    <section class="space-y-3">
-      <div class="text-[11px] font-mono tracking-widest text-slate-400 uppercase font-semibold">
-        ADVANCED PHYSIOLOGICAL KPIS
-      </div>
-
-      <div class="grid grid-cols-1 gap-3">
-        
-        <!-- KPI 1: Cumulative Fatigue Drag -->
-        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-colors">
-          <div class="flex items-center justify-between font-mono mb-1">
-            <span class="text-xs text-slate-300 uppercase tracking-wide">Cumulative Fatigue Drag</span>
-            <span
-              class="text-sm font-bold"
-              [ngClass]="(todayLog()?.advancedKPIs?.cumulativeFatigueDrag ?? 0) > 0 ? 'text-amber-400' : 'text-emerald-400'"
-            >
-              {{ (todayLog()?.advancedKPIs?.cumulativeFatigueDrag ?? 0) > 0 ? '+' : '' }}{{ todayLog()?.advancedKPIs?.cumulativeFatigueDrag }}
-            </span>
-          </div>
-          <p class="text-[11px] text-slate-400 leading-relaxed font-sans">
-            <span *ngIf="(todayLog()?.advancedKPIs?.cumulativeFatigueDrag ?? 0) > 0; else dragPositive">
-              7-day cardiac strain outpaces systemic restitution. Active parasympathetic deficit signals elevated risk of overreaching.
-            </span>
-            <ng-template #dragPositive>
-              Restitution buffer intact. 7-day allostatic balance indicates low systemic debt and high adaptation capacity.
-            </ng-template>
-          </p>
-        </div>
-
-        <!-- KPI 2: Autonomic Steering Index -->
-        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-colors">
-          <div class="flex items-center justify-between font-mono mb-1">
-            <span class="text-xs text-slate-300 uppercase tracking-wide">Autonomic Steering Index</span>
-            <span
-              class="text-sm font-bold"
-              [ngClass]="(todayLog()?.advancedKPIs?.autonomicSteeringIndex ?? 0) >= 0.1 ? 'text-emerald-400' : 'text-rose-400'"
-            >
-              {{ todayLog()?.advancedKPIs?.autonomicSteeringIndex }}
-            </span>
-          </div>
-          <p class="text-[11px] text-slate-400 leading-relaxed font-sans">
-            <span *ngIf="(todayLog()?.advancedKPIs?.autonomicSteeringIndex ?? 0) >= 0.1; else steeringSympathetic">
-              Vagal brake dominant [ln(RMSSD/RHR)*10]. Parasympathetic nervous system maintains anti-inflammatory tone and efficient cardiovascular deceleration.
-            </span>
-            <ng-template #steeringSympathetic>
-              Sympathetic overdrive detected. Diminished vagal tone indicates autonomic tension or incomplete post-exercise glycogen replenishment.
-            </ng-template>
-          </p>
-        </div>
-
-        <!-- KPI 3: Sleep Efficiency Coefficient -->
-        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-colors">
-          <div class="flex items-center justify-between font-mono mb-1">
-            <span class="text-xs text-slate-300 uppercase tracking-wide">Sleep Efficiency Coefficient</span>
-            <span
-              class="text-sm font-bold"
-              [ngClass]="(todayLog()?.advancedKPIs?.sleepEfficiencyCoefficient ?? 0) >= 0.40 ? 'text-cyan-400' : 'text-amber-400'"
-            >
-              {{ todayLog()?.advancedKPIs?.sleepEfficiencyCoefficient }}
-            </span>
-          </div>
-          <p class="text-[11px] text-slate-400 leading-relaxed font-sans">
-            <span *ngIf="(todayLog()?.advancedKPIs?.sleepEfficiencyCoefficient ?? 0) >= 0.40; else sleepFragmented">
-              Restorative architecture density consolidated. High proportion of Slow-Wave Deep and REM sleep with nocturnal bradycardia.
-            </span>
-            <ng-template #sleepFragmented>
-              Sleep architecture diluted or elevated nocturnal sleeping heart rate (avg {{ todayLog()?.biometrics?.avgSleepHR }} bpm) limiting nervous system reset.
-            </ng-template>
-          </p>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- INTERACTIVE LIFESTYLE JOURNAL: Instant Recalculation Engine -->
-    <section class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/90 shadow-md">
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="text-xs font-mono font-semibold uppercase tracking-wider text-slate-300">
-          MORNING LIFESTYLE JOURNAL
-        </h2>
-        <span class="text-[10px] font-mono text-emerald-400">INSTANT CORRELATION</span>
-      </div>
-      <p class="text-[11px] text-slate-400 mb-4">
-        Toggle evening or morning habits to simulate instantaneous physiological restitution shifts.
-      </p>
-
-      <div class="grid grid-cols-2 gap-2.5">
-        <button
-          type="button"
-          (click)="toggleHabit('drankAlcohol')"
-          [ngClass]="todayLog()?.journalHabits?.drankAlcohol ? 'bg-rose-500/20 border-rose-500/50 text-rose-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'"
-          class="flex items-center justify-between p-3 rounded-xl border text-xs font-mono transition-all text-left"
-        >
-          <div>
-            <div class="font-medium">ALCOHOL</div>
-            <div class="text-[9px] text-slate-500 mt-0.5">-25% HRV / +5 RHR</div>
-          </div>
-          <div class="w-3.5 h-3.5 rounded-full flex items-center justify-center border" [ngClass]="todayLog()?.journalHabits?.drankAlcohol ? 'bg-rose-500 border-rose-400' : 'border-slate-700'">
-            <span *ngIf="todayLog()?.journalHabits?.drankAlcohol" class="text-[9px] text-slate-950 font-bold">✓</span>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          (click)="toggleHabit('lateMeal')"
-          [ngClass]="todayLog()?.journalHabits?.lateMeal ? 'bg-amber-500/20 border-amber-500/50 text-amber-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'"
-          class="flex items-center justify-between p-3 rounded-xl border text-xs font-mono transition-all text-left"
-        >
-          <div>
-            <div class="font-medium">LATE MEAL</div>
-            <div class="text-[9px] text-slate-500 mt-0.5">-12% HRV / +3 HR</div>
-          </div>
-          <div class="w-3.5 h-3.5 rounded-full flex items-center justify-center border" [ngClass]="todayLog()?.journalHabits?.lateMeal ? 'bg-amber-500 border-amber-400' : 'border-slate-700'">
-            <span *ngIf="todayLog()?.journalHabits?.lateMeal" class="text-[9px] text-slate-950 font-bold">✓</span>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          (click)="toggleHabit('viewedSunlight')"
-          [ngClass]="todayLog()?.journalHabits?.viewedSunlight ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'"
-          class="flex items-center justify-between p-3 rounded-xl border text-xs font-mono transition-all text-left"
-        >
-          <div>
-            <div class="font-medium">SUNLIGHT</div>
-            <div class="text-[9px] text-slate-500 mt-0.5">+15% DEEP SLEEP</div>
-          </div>
-          <div class="w-3.5 h-3.5 rounded-full flex items-center justify-center border" [ngClass]="todayLog()?.journalHabits?.viewedSunlight ? 'bg-emerald-500 border-emerald-400' : 'border-slate-700'">
-            <span *ngIf="todayLog()?.journalHabits?.viewedSunlight" class="text-[9px] text-slate-950 font-bold">✓</span>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          (click)="toggleHabit('caffeineAfter2PM')"
-          [ngClass]="todayLog()?.journalHabits?.caffeineAfter2PM ? 'bg-purple-500/20 border-purple-500/50 text-purple-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'"
-          class="flex items-center justify-between p-3 rounded-xl border text-xs font-mono transition-all text-left"
-        >
-          <div>
-            <div class="font-medium">CAFFEINE >2PM</div>
-            <div class="text-[9px] text-slate-500 mt-0.5">ADENOSINE BLOCK</div>
-          </div>
-          <div class="w-3.5 h-3.5 rounded-full flex items-center justify-center border" [ngClass]="todayLog()?.journalHabits?.caffeineAfter2PM ? 'bg-purple-500 border-purple-400' : 'border-slate-700'">
-            <span *ngIf="todayLog()?.journalHabits?.caffeineAfter2PM" class="text-[9px] text-slate-950 font-bold">✓</span>
-          </div>
-        </button>
-      </div>
-    </section>
-
-    <!-- 7-DAY HISTORICAL TELEMETRY TREND SPARKBARS -->
-    <section class="p-5 rounded-2xl bg-slate-900/50 border border-slate-800/60">
-      <div class="flex items-baseline justify-between mb-3 text-xs font-mono">
-        <span class="text-slate-400 uppercase font-semibold">7-DAY RECOVERY HISTORY</span>
-        <span class="text-[10px] text-slate-500">SYSTEMIC EQUILIBRIUM</span>
-      </div>
-
-      <div class="grid grid-cols-7 gap-1.5 h-24 items-end pt-2">
-        <div *ngFor="let item of recentLogs()" class="flex flex-col items-center gap-1.5 h-full justify-end group">
-          <div
-            class="w-full rounded-sm transition-all duration-300 relative"
-            [ngClass]="item.scores.calculatedRecovery > 66 ? 'bg-emerald-400' : item.scores.calculatedRecovery >= 34 ? 'bg-amber-400' : 'bg-rose-500'"
-            [style.height.%]="item.scores.calculatedRecovery"
-            [title]="item.date + ': Recovery ' + item.scores.calculatedRecovery + '%, Strain ' + item.scores.calculatedStrain"
-          ></div>
-          <span class="text-[9px] font-mono text-slate-500 truncate">
-            {{ item.date.slice(8) }}
-          </span>
-        </div>
-      </div>
-    </section>
+    </div>
 
   </main>
 
-  <!-- MODAL 1: INTERACTIVE VAGAL RESONANCE BREATHING PACER (0.1 HZ) -->
+  <!-- ================================================================= -->
+  <!-- MODAL 1: 0.1 HZ VAGUS NERVE RESONANCE BREATHING PACER            -->
+  <!-- ================================================================= -->
   <div
     *ngIf="showVagusPacer()"
-    class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4"
+    class="fixed inset-0 z-50 bg-[#06070a]/90 backdrop-blur-xl flex items-center justify-center p-4"
   >
-    <div class="max-w-sm w-full p-6 rounded-3xl bg-slate-900 border border-teal-500/40 shadow-2xl flex flex-col items-center text-center space-y-6 font-mono relative">
+    <div class="max-w-sm w-full p-6 rounded-3xl whoop-surface-elevated flex flex-col items-center text-center space-y-6 font-mono relative">
       <button
         type="button"
         (click)="stopVagusPacer()"
-        class="absolute top-4 right-4 text-slate-400 hover:text-white text-xs px-2 py-1 rounded-lg bg-slate-800 cursor-pointer"
+        class="absolute top-4 right-4 text-zinc-400 hover:text-white text-xs px-2.5 py-1 rounded-xl bg-white/[0.06] border border-white/[0.08] cursor-pointer"
       >
-        ✕ CLOSE
+        ✕
       </button>
 
       <div>
-        <div class="text-[10px] tracking-widest text-teal-400 font-bold uppercase">
+        <div class="text-[10px] tracking-widest text-[#00F5A0] font-bold uppercase">
           VAGAL NERVE RESONANCE BIOFEEDBACK
         </div>
         <h3 class="text-lg font-bold text-white mt-1">0.1 Hz Baroreflex Cadence</h3>
-        <p class="text-xs text-slate-400 font-sans mt-0.5">Stimulates parasympathetic brake to elevate RMSSD.</p>
+        <p class="text-xs text-zinc-400 font-sans mt-0.5">Stimulates parasympathetic brake to elevate RMSSD.</p>
       </div>
 
-      <!-- Breathing Circle Visualizer -->
-      <div class="relative w-48 h-48 flex items-center justify-center">
-        <!-- Animated Expanding / Contracting Outer Ring -->
+      <!-- Breathing Ring Visualizer -->
+      <div class="relative w-52 h-52 flex items-center justify-center">
         <div
           class="absolute rounded-full transition-all duration-1000 ease-in-out"
-          [ngClass]="pacerPhase() === 'INHALE' ? 'w-44 h-44 bg-teal-500/20 border-2 border-teal-400 shadow-[0_0_40px_rgba(45,212,191,0.3)] scale-110' : (pacerPhase() === 'HOLD' ? 'w-44 h-44 bg-cyan-500/30 border-2 border-cyan-400 scale-105 animate-pulse' : 'w-24 h-24 bg-indigo-500/20 border-2 border-indigo-400 scale-90')"
+          [ngClass]="pacerPhase() === 'INHALE' ? 'w-48 h-48 bg-teal-500/20 border-2 border-teal-400 shadow-[0_0_50px_rgba(45,212,191,0.4)] scale-110' : (pacerPhase() === 'HOLD' ? 'w-48 h-48 bg-cyan-500/30 border-2 border-cyan-400 scale-105 animate-pulse' : 'w-24 h-24 bg-indigo-500/20 border-2 border-indigo-400 scale-90')"
         ></div>
 
-        <!-- Center Counter Display -->
         <div class="relative z-10 flex flex-col items-center">
           <span class="text-xs uppercase tracking-widest font-bold" [ngClass]="pacerPhase() === 'INHALE' ? 'text-teal-300' : (pacerPhase() === 'HOLD' ? 'text-cyan-300' : 'text-indigo-300')">
             {{ pacerPhase() }}
           </span>
-          <span class="text-5xl font-mono font-black text-white my-1">
+          <span class="text-6xl font-sans font-black text-white my-1">
             {{ pacerSecondsLeft() }}
           </span>
-          <span class="text-[10px] text-slate-400">SECONDS</span>
+          <span class="text-[10px] text-zinc-400">SECONDS</span>
         </div>
       </div>
 
-      <!-- Live Telemetry Feedback if Polar or Camera active -->
+      <!-- Live Cardiac Feedback if sensor connected -->
       <div *ngIf="bleHR.isConnected() || ppg.scanState().isActive" class="grid grid-cols-2 gap-2 w-full text-xs">
-        <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
-          <div class="text-[9px] text-slate-500 uppercase">LIVE BPM</div>
+        <div class="p-2.5 rounded-2xl bg-black/50 border border-white/[0.06]">
+          <div class="text-[9px] text-zinc-500 uppercase">LIVE BPM</div>
           <div class="text-xl font-bold text-rose-400 mt-0.5">
-            {{ bleHR.liveBpm() || ppg.scanState().liveBpm || '--' }} <span class="text-[10px] text-slate-500">bpm</span>
+            {{ bleHR.liveBpm() || ppg.scanState().liveBpm || '--' }} <span class="text-[10px] text-zinc-500">bpm</span>
           </div>
         </div>
-        <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
-          <div class="text-[9px] text-slate-500 uppercase">INSTANT RMSSD</div>
-          <div class="text-xl font-bold text-emerald-400 mt-0.5">
-            {{ bleHR.scanSession().currentRMSSD || ppg.scanState().currentRMSSD || '--' }} <span class="text-[10px] text-slate-500">ms</span>
+        <div class="p-2.5 rounded-2xl bg-black/50 border border-white/[0.06]">
+          <div class="text-[9px] text-zinc-500 uppercase">INSTANT RMSSD</div>
+          <div class="text-xl font-bold text-[#00F5A0] mt-0.5">
+            {{ bleHR.scanSession().currentRMSSD || ppg.scanState().currentRMSSD || '--' }} <span class="text-[10px] text-zinc-500">ms</span>
           </div>
         </div>
       </div>
@@ -1062,120 +1211,113 @@
       <button
         type="button"
         (click)="stopVagusPacer()"
-        class="w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-slate-950 font-bold uppercase tracking-wider text-xs transition-colors cursor-pointer"
+        class="w-full py-3 rounded-2xl bg-[#00F5A0] hover:bg-[#00D284] text-black font-bold uppercase tracking-wider text-xs transition-colors cursor-pointer"
       >
-        DONE / SAVE RELAXATION
+        DONE / COMPLETE SESSION
       </button>
     </div>
   </div>
 
-  <!-- MODAL 2: GLASS-BOX ALGORITHM INSPECTOR -->
+  <!-- ================================================================= -->
+  <!-- MODAL 2: GLASS-BOX ALGORITHM INSPECTOR                            -->
+  <!-- ================================================================= -->
   <div
     *ngIf="showAlgorithmInspector()"
-    class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+    class="fixed inset-0 z-50 bg-[#06070a]/90 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto"
   >
-    <div class="max-w-md w-full p-6 rounded-3xl bg-slate-900 border border-slate-700 shadow-2xl flex flex-col space-y-4 font-mono text-xs relative max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+    <div class="max-w-md w-full p-6 rounded-3xl whoop-surface-elevated flex flex-col space-y-4 font-mono text-xs relative max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.08]">
         <div class="flex items-center gap-2">
-          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
-          <span class="text-sm font-bold text-white uppercase">GLASS-BOX ALGORITHM INSPECTOR</span>
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#00F0FF]"></span>
+          <span class="text-sm font-bold text-white uppercase">GLASS-BOX ALGORITHM LOGIC</span>
         </div>
         <button
           type="button"
           (click)="toggleAlgorithmInspector()"
-          class="text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 cursor-pointer"
+          class="text-zinc-400 hover:text-white px-2 py-1 rounded-lg bg-white/[0.06] cursor-pointer"
         >
           ✕
         </button>
       </div>
 
-      <div class="space-y-4 text-slate-300 font-sans">
+      <div class="space-y-3 font-sans text-zinc-300">
         <!-- 1. RMSSD -->
-        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5 font-mono">
-          <div class="text-xs font-bold text-emerald-400 uppercase">1. RMSSD (Root Mean Square of Successive Differences)</div>
-          <p class="text-[11px] text-slate-400 font-sans">Measures high-frequency parasympathetic beat-to-beat variability:</p>
-          <div class="p-2 rounded bg-slate-900 text-teal-300 text-[11px]">
+        <div class="p-3.5 rounded-2xl bg-black/50 border border-white/[0.06] space-y-1.5 font-mono">
+          <div class="text-xs font-bold text-[#00F5A0] uppercase">1. RMSSD (High-Frequency Parasympathetic Variance)</div>
+          <p class="text-[11px] text-zinc-400 font-sans">Beat-to-beat difference in consecutive R-R cardiac intervals:</p>
+          <div class="p-2.5 rounded-xl bg-white/[0.04] text-teal-300 text-[11px]">
             RMSSD = &radic;[ 1/(N - 1) &times; &sum; (RR[i+1] - RR[i])&sup2; ]
           </div>
-          <div class="text-[10px] text-slate-400">Today's Value: <strong class="text-white">{{ todayLog()?.biometrics?.overnightRMSSD || 0 }} ms</strong></div>
+          <div class="text-[10px] text-zinc-400">Today: <strong class="text-white">{{ todayLog()?.biometrics?.overnightRMSSD || 0 }} ms</strong></div>
         </div>
 
-        <!-- 2. Recovery -->
-        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5 font-mono">
-          <div class="text-xs font-bold text-emerald-400 uppercase">2. Composite Daily Recovery % (0–100)</div>
-          <p class="text-[11px] text-slate-400 font-sans">Non-linear weighted autonomic recovery score relative to individual baseline:</p>
-          <div class="p-2 rounded bg-slate-900 text-teal-300 text-[11px]">
+        <!-- 2. Composite Recovery % -->
+        <div class="p-3.5 rounded-2xl bg-black/50 border border-white/[0.06] space-y-1.5 font-mono">
+          <div class="text-xs font-bold text-[#00F5A0] uppercase">2. Daily Recovery % (0–100)</div>
+          <p class="text-[11px] text-zinc-400 font-sans">Multi-factor baseline calibration:</p>
+          <div class="p-2.5 rounded-xl bg-white/[0.04] text-teal-300 text-[11px]">
             Recovery = (0.60 &times; HRV_Score) + (0.40 &times; RHR_Score)
           </div>
-          <div class="text-[10px] text-slate-400">Today's Score: <strong class="text-white">{{ recoveryScore() }}%</strong></div>
+          <div class="text-[10px] text-zinc-400">Today: <strong class="text-white">{{ recoveryScore() }}%</strong></div>
         </div>
 
-        <!-- 3. Banister TRIMP Strain -->
-        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5 font-mono">
-          <div class="text-xs font-bold text-cyan-400 uppercase">3. Banister TRIMP Asymptotic Day Strain (0.0–21.0)</div>
-          <p class="text-[11px] text-slate-400 font-sans">Cardiac load integrated over time and mapped asymptotically:</p>
-          <div class="p-2 rounded bg-slate-900 text-cyan-300 text-[11px]">
+        <!-- 3. Banister TRIMP Day Strain -->
+        <div class="p-3.5 rounded-2xl bg-black/50 border border-white/[0.06] space-y-1.5 font-mono">
+          <div class="text-xs font-bold text-cyan-400 uppercase">3. Banister TRIMP Strain (0.0–21.0)</div>
+          <p class="text-[11px] text-zinc-400 font-sans">Exponential HR cardiac load mapping:</p>
+          <div class="p-2.5 rounded-xl bg-white/[0.04] text-cyan-300 text-[11px]">
             Strain = 21.0 &times; [ 1 - e^(-TRIMP / 25.0) ]
           </div>
-          <div class="text-[10px] text-slate-400">Today's Strain: <strong class="text-white">{{ strainScore() }} / 21.0</strong></div>
-        </div>
-
-        <!-- 4. Autonomic Steering Index -->
-        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5 font-mono">
-          <div class="text-xs font-bold text-indigo-400 uppercase">4. Autonomic Steering Index</div>
-          <p class="text-[11px] text-slate-400 font-sans">Parasympathetic brake (+) vs Sympathetic tone (-):</p>
-          <div class="p-2 rounded bg-slate-900 text-indigo-300 text-[11px]">
-            Steering = ln( RMSSD / RestingHR ) &times; 10
-          </div>
-          <div class="text-[10px] text-slate-400">Today's Index: <strong class="text-white">{{ todayLog()?.advancedKPIs?.autonomicSteeringIndex || 0 }}</strong></div>
+          <div class="text-[10px] text-zinc-400">Today: <strong class="text-white">{{ strainScore() }} / 21.0</strong></div>
         </div>
       </div>
 
       <button
         type="button"
         (click)="toggleAlgorithmInspector()"
-        class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-mono text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+        class="w-full py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.12] text-white font-mono text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
       >
         CLOSE INSPECTOR
       </button>
     </div>
   </div>
 
-  <!-- MODAL 3: ATHLETE PHYSIOLOGY PROFILE (AGE, GENDER, WEIGHT, HEIGHT) -->
+  <!-- ================================================================= -->
+  <!-- MODAL 3: ATHLETE DEMOGRAPHICS & PROFILE SETTINGS                  -->
+  <!-- ================================================================= -->
   <div
     *ngIf="showProfileModal()"
-    class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+    class="fixed inset-0 z-50 bg-[#06070a]/90 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto"
   >
-    <div class="max-w-md w-full p-6 rounded-3xl bg-slate-900 border border-cyan-500/40 shadow-2xl flex flex-col space-y-4 font-mono text-xs relative max-h-[92vh] overflow-y-auto">
-      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+    <div class="max-w-md w-full p-6 rounded-3xl whoop-surface-elevated flex flex-col space-y-4 font-mono text-xs relative max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.08]">
         <div class="flex items-center gap-2">
-          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#00F0FF]"></span>
           <span class="text-sm font-bold text-white uppercase">ATHLETE PHYSIOLOGY STATS</span>
         </div>
         <button
           type="button"
           (click)="closeProfileModal()"
-          class="text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 cursor-pointer"
+          class="text-zinc-400 hover:text-white px-2 py-1 rounded-lg bg-white/[0.06] cursor-pointer"
         >
           ✕
         </button>
       </div>
 
-      <p class="text-[11px] text-slate-400 font-sans leading-relaxed">
-        Your physiological stats directly calibrate <strong class="text-slate-200">Max Heart Rate</strong>, <strong class="text-slate-200">Banister TRIMP Strain curves</strong>, <strong class="text-slate-200">biomechanical stride</strong>, and <strong class="text-slate-200">active caloric burn</strong>.
+      <p class="text-[11px] text-zinc-400 font-sans leading-relaxed">
+        Your physiological metrics calibrate <strong class="text-zinc-200">Max Heart Rate</strong>, <strong class="text-zinc-200">Banister TRIMP curves</strong>, <strong class="text-zinc-200">biomechanical stride</strong>, and <strong class="text-zinc-200">caloric burn</strong>.
       </p>
 
       <form (submit)="$event.preventDefault(); saveProfileSettings()" class="space-y-4 pt-1">
-        
-        <!-- Field 1: Gender -->
+        <!-- Gender -->
         <div class="space-y-1.5">
-          <label class="text-[10px] uppercase text-slate-400 font-bold">Biological Sex / Gender (Banister Curve Factor)</label>
+          <label class="text-[10px] uppercase text-zinc-400 font-bold">Biological Sex / Gender (Banister Factors)</label>
           <div class="grid grid-cols-3 gap-2">
             <button
               type="button"
               (click)="editGender.set('male')"
               class="py-2 rounded-xl border text-center transition-all cursor-pointer font-bold"
-              [ngClass]="editGender() === 'male' ? 'bg-cyan-600 text-slate-950 border-cyan-400' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'"
+              [ngClass]="editGender() === 'male' ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-black/40 border-white/[0.08] text-zinc-400 hover:border-white/[0.2]'"
             >
               MALE
             </button>
@@ -1183,7 +1325,7 @@
               type="button"
               (click)="editGender.set('female')"
               class="py-2 rounded-xl border text-center transition-all cursor-pointer font-bold"
-              [ngClass]="editGender() === 'female' ? 'bg-cyan-600 text-slate-950 border-cyan-400' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'"
+              [ngClass]="editGender() === 'female' ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-black/40 border-white/[0.08] text-zinc-400 hover:border-white/[0.2]'"
             >
               FEMALE
             </button>
@@ -1191,17 +1333,17 @@
               type="button"
               (click)="editGender.set('other')"
               class="py-2 rounded-xl border text-center transition-all cursor-pointer font-bold"
-              [ngClass]="editGender() === 'other' ? 'bg-cyan-600 text-slate-950 border-cyan-400' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'"
+              [ngClass]="editGender() === 'other' ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-black/40 border-white/[0.08] text-zinc-400 hover:border-white/[0.2]'"
             >
               OTHER
             </button>
           </div>
         </div>
 
-        <!-- Field 2: Age -->
+        <!-- Age -->
         <div class="space-y-1.5">
           <div class="flex items-center justify-between">
-            <label class="text-[10px] uppercase text-slate-400 font-bold">Age (Years)</label>
+            <label class="text-[10px] uppercase text-zinc-400 font-bold">Age (Years)</label>
             <span class="text-cyan-400 font-bold">{{ editAge() }} yrs &rarr; MaxHR: {{ 208 - Math.round(0.7 * editAge()) }} bpm</span>
           </div>
           <input
@@ -1210,17 +1352,14 @@
             max="100"
             [value]="editAge()"
             (input)="editAge.set(+$any($event.target).value)"
-            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:border-cyan-400 focus:outline-none"
+            class="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/[0.08] text-white font-mono focus:border-cyan-400 focus:outline-none"
           />
-          <div class="text-[9px] text-slate-500 font-sans">
-            Calibrates physiological ceiling via Tanaka Formula: <span class="font-mono text-cyan-300">208 - (0.7 &times; Age)</span>
-          </div>
         </div>
 
-        <!-- Field 3: Weight -->
+        <!-- Weight -->
         <div class="space-y-1.5">
           <div class="flex items-center justify-between">
-            <label class="text-[10px] uppercase text-slate-400 font-bold">Body Weight (kg)</label>
+            <label class="text-[10px] uppercase text-zinc-400 font-bold">Body Weight (kg)</label>
             <span class="text-cyan-400 font-bold">{{ editWeightKg() }} kg ({{ Math.round(editWeightKg() * 2.20462) }} lbs)</span>
           </div>
           <input
@@ -1229,17 +1368,14 @@
             max="250"
             [value]="editWeightKg()"
             (input)="editWeightKg.set(+$any($event.target).value)"
-            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:border-cyan-400 focus:outline-none"
+            class="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/[0.08] text-white font-mono focus:border-cyan-400 focus:outline-none"
           />
-          <div class="text-[9px] text-slate-500 font-sans">
-            Calibrates active caloric burn and Basal Metabolic Rate (BMR).
-          </div>
         </div>
 
-        <!-- Field 4: Height -->
+        <!-- Height -->
         <div class="space-y-1.5">
           <div class="flex items-center justify-between">
-            <label class="text-[10px] uppercase text-slate-400 font-bold">Height (cm)</label>
+            <label class="text-[10px] uppercase text-zinc-400 font-bold">Height (cm)</label>
             <span class="text-cyan-400 font-bold">{{ editHeightCm() }} cm &rarr; Stride: {{ (editHeightCm() * 0.415 / 100).toFixed(2) }} m</span>
           </div>
           <input
@@ -1248,16 +1384,13 @@
             max="230"
             [value]="editHeightCm()"
             (input)="editHeightCm.set(+$any($event.target).value)"
-            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:border-cyan-400 focus:outline-none"
+            class="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/[0.08] text-white font-mono focus:border-cyan-400 focus:outline-none"
           />
-          <div class="text-[9px] text-slate-500 font-sans">
-            Calculates exact biomechanical stride length for walking and volleyball movements.
-          </div>
         </div>
 
-        <!-- Field 5: Daily Step Goal -->
+        <!-- Step Goal -->
         <div class="space-y-1.5">
-          <label class="text-[10px] uppercase text-slate-400 font-bold">Daily Step Target</label>
+          <label class="text-[10px] uppercase text-zinc-400 font-bold">Daily Footstep Target</label>
           <input
             type="number"
             min="1000"
@@ -1265,24 +1398,23 @@
             step="500"
             [value]="editStepGoal()"
             (input)="editStepGoal.set(+$any($event.target).value)"
-            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:border-cyan-400 focus:outline-none"
+            class="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/[0.08] text-white font-mono focus:border-cyan-400 focus:outline-none"
           />
         </div>
 
-        <!-- Buttons -->
         <div class="flex gap-2 pt-2">
           <button
             type="button"
             (click)="saveProfileSettings()"
             [disabled]="isProfileSaving()"
-            class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-bold uppercase tracking-wider text-xs transition-all shadow-md cursor-pointer disabled:opacity-50"
+            class="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-black font-bold uppercase tracking-wider text-xs transition-all shadow-md cursor-pointer disabled:opacity-50"
           >
             {{ isProfileSaving() ? 'SAVING...' : 'SAVE PHYSIOLOGICAL PROFILE' }}
           </button>
           <button
             type="button"
             (click)="closeProfileModal()"
-            class="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold uppercase tracking-wider text-xs transition-colors cursor-pointer"
+            class="py-3 px-4 rounded-xl bg-white/[0.08] hover:bg-white/[0.12] text-zinc-300 font-bold uppercase tracking-wider text-xs transition-colors cursor-pointer"
           >
             CANCEL
           </button>
@@ -1291,33 +1423,35 @@
     </div>
   </div>
 
-  <!-- MODAL 4: STEP SYNC MODAL (SYNC FROM STEPUP / APPLE HEALTH / GOOGLE FIT) -->
+  <!-- ================================================================= -->
+  <!-- MODAL 4: STEP SYNC MODAL (STEPUP / HEALTH / GOOGLE FIT)           -->
+  <!-- ================================================================= -->
   <div
     *ngIf="showStepSyncModal()"
-    class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+    class="fixed inset-0 z-50 bg-[#06070a]/90 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto"
   >
-    <div class="max-w-sm w-full p-6 rounded-3xl bg-slate-900 border border-emerald-500/40 shadow-2xl flex flex-col space-y-4 font-mono text-xs relative">
-      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+    <div class="max-w-sm w-full p-6 rounded-3xl whoop-surface-elevated flex flex-col space-y-4 font-mono text-xs relative">
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.08]">
         <div class="flex items-center gap-2">
-          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
-          <span class="text-sm font-bold text-white uppercase">SYNC DAILY STEPS</span>
+          <span class="w-2.5 h-2.5 rounded-full bg-[#00F5A0] shadow-[0_0_8px_#00F5A0]"></span>
+          <span class="text-sm font-bold text-white uppercase">SYNC FOOTSTEPS</span>
         </div>
         <button
           type="button"
           (click)="closeStepSyncModal()"
-          class="text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 cursor-pointer"
+          class="text-zinc-400 hover:text-white px-2 py-1 rounded-lg bg-white/[0.06] cursor-pointer"
         >
           ✕
         </button>
       </div>
 
-      <p class="text-[11px] text-slate-400 font-sans leading-relaxed">
-        Sync your steps from <strong class="text-slate-200">StepUp</strong>, <strong class="text-slate-200">Apple Health</strong>, or <strong class="text-slate-200">Google Fit</strong>. This updates your live distance, active burn, and daily strain immediately:
+      <p class="text-[11px] text-zinc-400 font-sans leading-relaxed">
+        Sync steps from <strong class="text-zinc-200">StepUp</strong>, <strong class="text-zinc-200">Apple Health</strong>, or <strong class="text-zinc-200">Google Fit</strong>. Recalculates distance, calories, and strain immediately:
       </p>
 
       <div class="space-y-3 pt-1">
         <div class="space-y-1.5">
-          <label class="text-[10px] uppercase text-slate-400 font-bold">Today's Total Footsteps</label>
+          <label class="text-[10px] uppercase text-zinc-400 font-bold">Today's Total Footsteps</label>
           <input
             type="number"
             min="0"
@@ -1325,57 +1459,29 @@
             step="100"
             [value]="manualStepsInput()"
             (input)="manualStepsInput.set(+$any($event.target).value)"
-            class="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-2xl font-bold text-emerald-400 font-mono text-center focus:border-emerald-400 focus:outline-none"
+            class="w-full px-3 py-3 rounded-2xl bg-black/60 border border-white/[0.08] text-3xl font-black text-[#00F5A0] font-sans text-center focus:border-[#00F5A0] focus:outline-none"
           />
         </div>
 
-        <!-- Quick Add Buttons -->
-        <div class="space-y-1">
-          <div class="text-[9px] uppercase text-slate-500">Quick Adjustments</div>
-          <div class="grid grid-cols-4 gap-1.5 font-mono text-[10px]">
-            <button
-              type="button"
-              (click)="quickAddSteps(500)"
-              class="py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700/80 transition-colors"
-            >
-              +500
-            </button>
-            <button
-              type="button"
-              (click)="quickAddSteps(1000)"
-              class="py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700/80 transition-colors"
-            >
-              +1,000
-            </button>
-            <button
-              type="button"
-              (click)="quickAddSteps(2500)"
-              class="py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700/80 transition-colors"
-            >
-              +2,500
-            </button>
-            <button
-              type="button"
-              (click)="quickAddSteps(5000)"
-              class="py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700/80 transition-colors"
-            >
-              +5,000
-            </button>
-          </div>
+        <div class="grid grid-cols-4 gap-1.5 font-mono text-[10px]">
+          <button type="button" (click)="quickAddSteps(500)" class="py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-zinc-300 border border-white/[0.08] transition-colors">+500</button>
+          <button type="button" (click)="quickAddSteps(1000)" class="py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-zinc-300 border border-white/[0.08] transition-colors">+1k</button>
+          <button type="button" (click)="quickAddSteps(2500)" class="py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-zinc-300 border border-white/[0.08] transition-colors">+2.5k</button>
+          <button type="button" (click)="quickAddSteps(5000)" class="py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-zinc-300 border border-white/[0.08] transition-colors">+5k</button>
         </div>
 
         <div class="flex gap-2 pt-2">
           <button
             type="button"
             (click)="confirmStepSync()"
-            class="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase tracking-wider text-xs transition-all shadow-md cursor-pointer"
+            class="flex-1 py-3 px-4 rounded-xl bg-[#00F5A0] hover:bg-[#00D284] text-black font-bold uppercase tracking-wider text-xs transition-all shadow-md cursor-pointer"
           >
             CONFIRM & SYNC
           </button>
           <button
             type="button"
             (click)="closeStepSyncModal()"
-            class="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold uppercase tracking-wider text-xs transition-colors cursor-pointer"
+            class="py-3 px-4 rounded-xl bg-white/[0.08] hover:bg-white/[0.12] text-zinc-300 font-bold uppercase tracking-wider text-xs transition-colors cursor-pointer"
           >
             CANCEL
           </button>
@@ -1384,28 +1490,30 @@
     </div>
   </div>
 
-  <!-- MODAL 5: EMAIL & PASSWORD ATHLETE AUTH MODAL -->
+  <!-- ================================================================= -->
+  <!-- MODAL 5: EMAIL AUTHENTICATION MODAL                               -->
+  <!-- ================================================================= -->
   <div
     *ngIf="showEmailLoginModal()"
-    class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+    class="fixed inset-0 z-50 bg-[#06070a]/90 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto"
   >
-    <div class="max-w-sm w-full p-6 rounded-3xl bg-slate-900 border border-slate-700 shadow-2xl flex flex-col space-y-4 font-mono text-xs relative">
-      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+    <div class="max-w-sm w-full p-6 rounded-3xl whoop-surface-elevated flex flex-col space-y-4 font-mono text-xs relative">
+      <div class="flex items-center justify-between pb-3 border-b border-white/[0.08]">
         <div class="flex items-center gap-2">
-          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#00F0FF]"></span>
           <span class="text-sm font-bold text-white uppercase">ATHLETE EMAIL SIGN IN</span>
         </div>
         <button
           type="button"
           (click)="showEmailLoginModal.set(false)"
-          class="text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 cursor-pointer"
+          class="text-zinc-400 hover:text-white px-2 py-1 rounded-lg bg-white/[0.06] cursor-pointer"
         >
           ✕
         </button>
       </div>
 
-      <p class="text-[11px] text-slate-400 font-sans leading-relaxed">
-        Sign in or create your cloud athlete account with email. Works directly on Android, iOS, and Web without browser popup restrictions:
+      <p class="text-[11px] text-zinc-400 font-sans leading-relaxed">
+        Sign in with email and password to sync your biometrics across your phone and web:
       </p>
 
       <div *ngIf="authService.authError()" class="p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/50 text-[10px] text-rose-300">
@@ -1414,30 +1522,27 @@
 
       <form (submit)="$event.preventDefault(); submitEmailLogin()" class="space-y-3 pt-1">
         <div class="space-y-1">
-          <label class="text-[10px] uppercase text-slate-400 font-bold">Email Address</label>
+          <label class="text-[10px] uppercase text-zinc-400 font-bold">Email Address</label>
           <input
             type="email"
             required
             placeholder="athlete@vagus.health"
             [value]="emailInput()"
             (input)="emailInput.set($any($event.target).value)"
-            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:border-cyan-400 focus:outline-none"
+            class="w-full px-3 py-2.5 rounded-xl bg-black/50 border border-white/[0.08] text-white font-mono focus:border-cyan-400 focus:outline-none"
           />
         </div>
 
         <div class="space-y-1">
-          <label class="text-[10px] uppercase text-slate-400 font-bold">Password</label>
+          <label class="text-[10px] uppercase text-zinc-400 font-bold">Password</label>
           <input
             type="password"
             required
             placeholder="••••••••"
             [value]="passwordInput()"
             (input)="passwordInput.set($any($event.target).value)"
-            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:border-cyan-400 focus:outline-none"
+            class="w-full px-3 py-2.5 rounded-xl bg-black/50 border border-white/[0.08] text-white font-mono focus:border-cyan-400 focus:outline-none"
           />
-          <div class="text-[9px] text-slate-500 font-sans">
-            If you don't have an account, entering your password will automatically register you!
-          </div>
         </div>
 
         <div class="flex gap-2 pt-2">
@@ -1445,14 +1550,14 @@
             type="button"
             (click)="submitEmailLogin()"
             [disabled]="authService.isLoading()"
-            class="flex-1 py-2.5 px-4 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold uppercase tracking-wider text-xs transition-all shadow-md cursor-pointer disabled:opacity-50"
+            class="flex-1 py-3 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-bold uppercase tracking-wider text-xs transition-all shadow-md cursor-pointer disabled:opacity-50"
           >
             {{ authService.isLoading() ? 'CONNECTING...' : 'CONTINUE' }}
           </button>
           <button
             type="button"
             (click)="showEmailLoginModal.set(false)"
-            class="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold uppercase tracking-wider text-xs transition-colors cursor-pointer"
+            class="py-3 px-4 rounded-xl bg-white/[0.08] hover:bg-white/[0.12] text-zinc-300 font-bold uppercase tracking-wider text-xs transition-colors cursor-pointer"
           >
             CANCEL
           </button>
@@ -1460,4 +1565,5 @@
       </form>
     </div>
   </div>
+
 </div>

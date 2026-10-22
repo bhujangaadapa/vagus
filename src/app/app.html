@@ -1,29 +1,29 @@
-<div class="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-slate-950">
+<div class="min-h-screen bg-[#06070a] text-slate-100 flex flex-col font-sans selection:bg-[#00F5A0] selection:text-black">
 
   <!-- Top Global System Navigation Bar -->
-  <header class="h-14 bg-slate-950/90 border-b border-slate-800/80 sticky top-0 z-50 backdrop-blur px-4 sm:px-6 flex items-center justify-between">
+  <header class="h-14 bg-[#06070a]/90 border-b border-white/[0.06] sticky top-0 z-50 backdrop-blur-xl px-4 sm:px-6 flex items-center justify-between">
     <!-- Brand / System Title -->
     <div class="flex items-center gap-3">
-      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 via-indigo-600 to-teal-400 p-[1px] flex items-center justify-center shadow-lg shadow-cyan-950/50">
-        <div class="w-full h-full bg-slate-950 rounded-[7px] flex items-center justify-center font-mono font-black text-cyan-400 text-sm tracking-tighter">
+      <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#00F5A0] via-cyan-500 to-indigo-600 p-[1.5px] flex items-center justify-center shadow-lg shadow-emerald-950/40">
+        <div class="w-full h-full bg-[#06070a] rounded-[10px] flex items-center justify-center font-mono font-black text-[#00F5A0] text-sm tracking-tighter">
           V
         </div>
       </div>
       <div class="flex items-baseline gap-2">
-        <span class="font-mono font-bold tracking-wider text-base text-white">VAGUS</span>
-        <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/60 text-cyan-300">
-          OS v1.2.0
+        <span class="font-mono font-extrabold tracking-wider text-base text-white">VAGUS</span>
+        <span class="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-white/[0.05] border border-white/[0.08] text-zinc-400">
+          WHOOP 4.0 ENGINE
         </span>
       </div>
     </div>
 
     <!-- View Switcher -->
-    <nav class="flex items-center gap-1.5 p-1 rounded-xl bg-slate-900 border border-slate-800 font-mono text-xs">
+    <nav class="flex items-center gap-1.5 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] font-mono text-xs">
       <button
         type="button"
         (click)="setView('dashboard')"
-        class="px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 font-semibold cursor-pointer"
-        [ngClass]="activeView() === 'dashboard' ? 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-slate-950 shadow-md font-bold' : 'text-slate-400 hover:text-slate-200'"
+        class="px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 font-semibold cursor-pointer"
+        [ngClass]="activeView() === 'dashboard' ? 'bg-[#00F5A0] text-black shadow-md font-bold' : 'text-zinc-400 hover:text-white'"
       >
         <span>⚡ DASHBOARD</span>
       </button>
@@ -31,10 +31,10 @@
       <button
         type="button"
         (click)="setView('developer-lab')"
-        class="px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 font-semibold cursor-pointer"
-        [ngClass]="activeView() === 'developer-lab' ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md font-bold' : 'text-slate-400 hover:text-slate-200'"
+        class="px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 font-semibold cursor-pointer"
+        [ngClass]="activeView() === 'developer-lab' ? 'bg-indigo-600 text-white shadow-md font-bold' : 'text-zinc-400 hover:text-white'"
       >
-        <span>🔬 MASTER DEV LAB</span>
+        <span>🔬 DEV LAB</span>
       </button>
     </nav>
   </header>

@@ -2,7 +2,7 @@
 
 @layer base {
   body {
-    @apply bg-slate-950 text-slate-100 antialiased font-sans select-none min-h-screen;
+    @apply bg-[#06070a] text-slate-100 antialiased font-sans select-none min-h-screen;
     -webkit-tap-highlight-color: transparent;
   }
 }

@@ -77,6 +77,18 @@ export class DashboardComponent implements OnInit {
     return this.physicsEngine.calculateStepCalories(this.liveSteps(), weight);
   });
 
+  // Active Pillar Navigation (WHOOP 4.0 Tabs: Overview, Recovery, Strain, Sleep, Sensors)
+  public readonly activePillar = signal<'overview' | 'recovery' | 'strain' | 'sleep' | 'sensors'>('overview');
+  public setPillar(pillar: 'overview' | 'recovery' | 'strain' | 'sleep' | 'sensors'): void {
+    this.activePillar.set(pillar);
+  }
+
+  // Active Hardware Sub-Tab
+  public readonly activeHardwareTab = signal<'polar' | 'ppg' | 'xiaomi' | 'steps'>('polar');
+  public setHardwareTab(tab: 'polar' | 'ppg' | 'xiaomi' | 'steps'): void {
+    this.activeHardwareTab.set(tab);
+  }
+
   // Profile Settings Modal State
   public readonly showProfileModal = signal<boolean>(false);
   public readonly editGender = signal<'male' | 'female' | 'other'>('male');
@@ -88,10 +100,48 @@ export class DashboardComponent implements OnInit {
 
   public readonly recoveryColor = computed(() => {
     const score = this.recoveryScore();
-    if (score === 0) return { text: 'text-slate-400', stroke: '#475569', bg: 'bg-slate-800/20', border: 'border-slate-700/30' };
-    if (score > 66) return { text: 'text-emerald-400', stroke: '#34d399', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' };
-    if (score >= 34) return { text: 'text-amber-400', stroke: '#fbbf24', bg: 'bg-amber-500/10', border: 'border-amber-500/30' };
-    return { text: 'text-rose-500', stroke: '#f43f5e', bg: 'bg-rose-500/10', border: 'border-rose-500/30' };
+    if (score === 0) {
+      return {
+        text: 'text-slate-400',
+        stroke: '#475569',
+        glow: 'rgba(100, 116, 139, 0.25)',
+        bg: 'bg-slate-800/20',
+        border: 'border-slate-700/30',
+        gradient: 'from-slate-500 to-slate-700',
+        zone: 'UNSCANNED'
+      };
+    }
+    if (score > 66) {
+      return {
+        text: 'text-[#00F5A0]',
+        stroke: '#00F5A0',
+        glow: 'rgba(0, 245, 160, 0.4)',
+        bg: 'bg-[#00F5A0]/10',
+        border: 'border-[#00F5A0]/30',
+        gradient: 'from-[#00F5A0] to-[#00B875]',
+        zone: 'GREEN RECOVERY'
+      };
+    }
+    if (score >= 34) {
+      return {
+        text: 'text-[#FFB800]',
+        stroke: '#FFB800',
+        glow: 'rgba(255, 184, 0, 0.4)',
+        bg: 'bg-[#FFB800]/10',
+        border: 'border-[#FFB800]/30',
+        gradient: 'from-[#FFB800] to-[#E59400]',
+        zone: 'YELLOW RECOVERY'
+      };
+    }
+    return {
+      text: 'text-[#FF334B]',
+      stroke: '#FF334B',
+      glow: 'rgba(255, 51, 75, 0.4)',
+      bg: 'bg-[#FF334B]/10',
+      border: 'border-[#FF334B]/30',
+      gradient: 'from-[#FF334B] to-[#D91B33]',
+      zone: 'RED RECOVERY'
+    };
   });
 
   public readonly recoveryStatusText = computed(() => {
@@ -106,13 +156,29 @@ export class DashboardComponent implements OnInit {
     return this.physicsEngine.calculateTargetStrain(this.recoveryScore());
   });
 
-  // SVG Radial progress calculations
-  public readonly circleRadius = 72;
+  public readonly strainZoneText = computed(() => {
+    const s = this.strainScore();
+    if (s >= 18) return 'ALL OUT';
+    if (s >= 14) return 'STRENUOUS';
+    if (s >= 10) return 'MODERATE';
+    if (s >= 5) return 'LIGHT';
+    return 'RESTORATIVE';
+  });
+
+  // SVG Radial progress calculations (Thick WHOOP Hero Ring)
+  public readonly circleRadius = 80;
   public readonly circumference = 2 * Math.PI * this.circleRadius;
   public readonly strokeDashoffset = computed(() => {
     const score = this.recoveryScore();
     const progress = Math.min(100, Math.max(0, score)) / 100;
     return this.circumference * (1 - progress);
+  });
+
+  // Sleep Performance percentage
+  public readonly sleepPerformancePercent = computed(() => {
+    const logged = this.todayLog()?.biometrics?.sleepMinutes || 460;
+    const need = this.tonightSleepNeedMinutes() || 480;
+    return Math.min(100, Math.round((logged / need) * 100));
   });
 
   // 7-day recent logs for trend view
