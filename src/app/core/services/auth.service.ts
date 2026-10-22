@@ -34,19 +34,26 @@ export class AuthService {
   };
 
   constructor() {
-    // Hydrate persistent athlete session if exists
+    // 1. Hydrate persistent athlete session if exists (instantly logs user in across reboots)
     if (typeof localStorage !== 'undefined') {
       const cachedSession = localStorage.getItem('vagus_active_athlete_session');
       if (cachedSession) {
         try {
           const user = JSON.parse(cachedSession) as User;
           this.currentUser.set(user);
+
+          // Restore cached user profile immediately
+          const cachedProfile = localStorage.getItem(`vagus_user_profile_${user.uid}`);
+          if (cachedProfile) {
+            this.userProfile.set(JSON.parse(cachedProfile));
+          }
+
           this.maintainUserDocument(user);
         } catch {}
       }
     }
 
-    // Check if user was redirected back from Google OAuth
+    // 2. Check if user was redirected back from Google OAuth
     getRedirectResult(this.auth)
       .then(async (result) => {
         if (result && result.user) {
@@ -58,13 +65,18 @@ export class AuthService {
         console.warn('[AuthService] Redirect result handler:', err);
       });
 
-    // Track real-time authentication state
+    // 3. Track real-time authentication state without erasing local persistent session
     authState(this.auth).subscribe(async (user) => {
-      this.currentUser.set(user);
       if (user) {
+        this.currentUser.set(user);
         await this.maintainUserDocument(user);
       } else {
-        this.userProfile.set(null);
+        // Only set to null if there is NO active persistent session in localStorage
+        const cached = typeof localStorage !== 'undefined' ? localStorage.getItem('vagus_active_athlete_session') : null;
+        if (!cached) {
+          this.currentUser.set(null);
+          this.userProfile.set(null);
+        }
       }
     });
   }
@@ -124,9 +136,18 @@ export class AuthService {
 
     try {
       const cred = await signInWithEmailAndPassword(this.auth, email, pass);
-      this.currentUser.set(cred.user);
-      await this.maintainUserDocument(cred.user);
-      return cred.user;
+      const user = cred.user;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('vagus_active_athlete_session', JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName || user.email?.split('@')[0],
+          photoURL: user.photoURL,
+        }));
+      }
+      this.currentUser.set(user);
+      await this.maintainUserDocument(user);
+      return user;
     } catch (err: any) {
       // If Firebase project has not enabled Email/Password provider in Console, seamlessly create direct athlete session
       if (err.code === 'auth/operation-not-allowed') {
@@ -142,9 +163,18 @@ export class AuthService {
         // Automatically create account if it doesn't exist yet
         try {
           const newCred = await createUserWithEmailAndPassword(this.auth, email, pass);
-          this.currentUser.set(newCred.user);
-          await this.maintainUserDocument(newCred.user);
-          return newCred.user;
+          const user = newCred.user;
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('vagus_active_athlete_session', JSON.stringify({
+              uid: user.uid,
+              email: user.email,
+              displayName: user.displayName || user.email?.split('@')[0],
+              photoURL: user.photoURL,
+            }));
+          }
+          this.currentUser.set(user);
+          await this.maintainUserDocument(user);
+          return user;
         } catch (createErr: any) {
           if (
             createErr.code === 'auth/operation-not-allowed' ||
