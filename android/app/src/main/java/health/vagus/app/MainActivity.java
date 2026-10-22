@@ -30,6 +30,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     private SensorManager sensorManager;
     private Sensor stepCounterSensor;
     private int currentDailySteps = 0;
+    private int lastRawHardwareSteps = 0;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -96,6 +97,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     public void onSensorChanged(SensorEvent event) {
         if (event.sensor.getType() == Sensor.TYPE_STEP_COUNTER) {
             int totalHardwareSteps = (int) event.values[0];
+            this.lastRawHardwareSteps = totalHardwareSteps;
             int dailySteps = calculateDailySteps(totalHardwareSteps);
             this.currentDailySteps = dailySteps;
             dispatchStepUpdate(dailySteps);
@@ -174,6 +176,20 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
         @JavascriptInterface
         public boolean isSensorAvailable() {
             return stepCounterSensor != null;
+        }
+
+        @JavascriptInterface
+        public void setInitialBaseline(int currentSteps) {
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            String todayStr = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+            int baseline = Math.max(0, lastRawHardwareSteps - currentSteps);
+            prefs.edit()
+                .putString(KEY_DATE, todayStr)
+                .putInt(KEY_BASELINE, baseline)
+                .putInt(KEY_LAST_STEPS, currentSteps)
+                .apply();
+            currentDailySteps = currentSteps;
+            dispatchStepUpdate(currentSteps);
         }
 
         @JavascriptInterface

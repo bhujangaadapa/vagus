@@ -417,10 +417,16 @@ export class PedometerService {
     const targetUid = userId || this.currentUserId;
     const targetDate = dateStr || this.currentDateStr;
 
+    // Calibrate native Android hardware baseline so hardware steps continue smoothly from targetSteps
+    const bridge = typeof window !== 'undefined' ? (window as any).AndroidHardwarePedometer : null;
+    if (bridge && typeof bridge.setInitialBaseline === 'function') {
+      bridge.setInitialBaseline(targetSteps);
+    }
+
     this.currentSteps.set(targetSteps);
     this.persistStepCount(targetSteps);
     this.dataBridge.updateLiveSteps(targetUid, targetDate, targetSteps);
-    this.statusMessage.set(`Synced: ${targetSteps.toLocaleString()} steps logged for today.`);
+    this.statusMessage.set(`Hardware Calibrated: ${targetSteps.toLocaleString()} steps today.`);
   }
 
   /**
