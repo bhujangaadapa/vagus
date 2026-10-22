@@ -122,6 +122,13 @@ export class DashboardComponent implements OnInit {
     }
   }
 
+  public async loginDemo(): Promise<void> {
+    const user = await this.authService.loginAsDemoAthlete();
+    if (user) {
+      await this.seedInitialData();
+    }
+  }
+
   public async logout(): Promise<void> {
     await this.authService.logout();
     await this.seedInitialData();

@@ -93,8 +93,15 @@
           <span>{{ authService.isLoading() ? 'SIGNING IN...' : 'GOOGLE SIGN IN' }}</span>
         </button>
       </div>
-      <div *ngIf="authService.authError()" class="mt-1 text-[10px] font-mono text-amber-400">
-        {{ authService.authError() }}
+      <div *ngIf="authService.authError()" class="mt-2 p-2 rounded bg-amber-950/40 border border-amber-800/40 flex items-center justify-between text-[10px] font-mono text-amber-300">
+        <span class="truncate mr-2">{{ authService.authError() }}</span>
+        <button
+          type="button"
+          (click)="loginDemo()"
+          class="shrink-0 px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-bold"
+        >
+          DEMO LOGIN
+        </button>
       </div>
     </ng-template>
   </section>

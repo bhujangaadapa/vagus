@@ -59,9 +59,17 @@ export class AuthService {
       // Handle common Firebase Auth errors gracefully in development
       if (error.code === 'auth/popup-closed-by-user') {
         this.authError.set('Sign-in cancelled by user.');
-      } else if (error.code === 'auth/unauthorized-domain' || error.code === 'auth/invalid-api-key') {
-        this.authError.set('Firebase Auth domain not authorized or mock key active. Bridging session.');
-        // Create an offline/simulated authenticated session for the demo
+      } else if (
+        error.code === 'auth/unauthorized-domain' ||
+        error.code === 'auth/invalid-api-key' ||
+        error.code?.includes('api-key') ||
+        error.message?.includes('api-key-not-valid')
+      ) {
+        if (error.code === 'auth/unauthorized-domain') {
+          this.authError.set('Domain authorization pending in Firebase Console. Switched to athlete session.');
+        } else {
+          this.authError.set(null);
+        }
         return this.createSimulatedSession();
       } else {
         this.authError.set(error.message || 'Authentication error.');
@@ -70,6 +78,14 @@ export class AuthService {
     } finally {
       this.isLoading.set(false);
     }
+  }
+
+  /**
+   * Fast 1-click athlete session for instant testing
+   */
+  public async loginAsDemoAthlete(): Promise<User> {
+    this.authError.set(null);
+    return this.createSimulatedSession();
   }
 
   /**
