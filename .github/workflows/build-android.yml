@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -44,3 +46,15 @@ jobs:
         with:
           name: Vagus-Android-App-Debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: rolling-latest
+          name: "Vagus Android APK (Continuous Delivery)"
+          body: |
+            Automated continuous delivery build of Vagus with latest WHOOP 4.0 UI, Polar BLE telemetry, Camera PPG, and dual-OS step tracking.
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
