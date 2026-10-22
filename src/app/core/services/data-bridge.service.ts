@@ -96,11 +96,23 @@ export class DataBridgeService {
       const logsQuery = query(logsCollectionRef, orderBy('date', 'asc'));
 
       return (collectionData(logsQuery, { idField: 'date' }) as Observable<DailyBiometricLog[]>).pipe(
-        tap((logs) => {
+        tap(async (logs) => {
+          const todayStr = this.getFormattedDate(new Date());
+
           if (logs && logs.length > 0) {
             this.logsSubject.next(logs);
-            const todayStr = this.getFormattedDate(new Date());
-            const today = logs.find((l) => l.date === todayStr) || logs[logs.length - 1];
+            let today = logs.find((l) => l.date === todayStr);
+
+            // Autonomous midnight rollover: If a new calendar day has started,
+            // automatically initialize today's fresh log without erasing history!
+            if (!today) {
+              today = await this.initializeAutonomousDay(userId, todayStr, logs);
+            }
+
+            this.todayLogSubject.next(today);
+          } else {
+            // First time ever: initialize today's clean record
+            const today = await this.initializeAutonomousDay(userId, todayStr, []);
             this.todayLogSubject.next(today);
           }
         }),
@@ -263,6 +275,67 @@ export class DataBridgeService {
     }
 
     return baseLog;
+  }
+
+  /**
+   * Autonomous Midnight Rollover
+   * Automatically initializes a fresh daily log when a new calendar day arrives.
+   * Steps start at 0, Day Strain starts at 0.0, and past days are permanently preserved.
+   */
+  public async initializeAutonomousDay(
+    userId: string,
+    todayStr: string,
+    historyLogs: DailyBiometricLog[]
+  ): Promise<DailyBiometricLog> {
+    const rolling7 = historyLogs.slice(-7).map((l) => ({
+      strain: l.scores.calculatedStrain,
+      recovery: l.scores.calculatedRecovery,
+    }));
+    const fatigueDrag = this.physicsEngine.calculateFatigueDrag(rolling7);
+
+    const freshDay: DailyBiometricLog = {
+      date: todayStr,
+      biometrics: {
+        overnightRMSSD: 0,
+        restingHR: 0,
+        sleepMinutes: 0,
+        deepSleepMinutes: 0,
+        remSleepMinutes: 0,
+        avgSleepHR: 0,
+        steps: 0,
+      },
+      journalHabits: {
+        drankAlcohol: false,
+        lateMeal: false,
+        viewedSunlight: false,
+        caffeineAfter2PM: false,
+      },
+      scores: {
+        calculatedRecovery: 0,
+        calculatedStrain: 0.0,
+      },
+      advancedKPIs: {
+        cumulativeFatigueDrag: fatigueDrag,
+        autonomicSteeringIndex: 0.0,
+        sleepEfficiencyCoefficient: 0.0,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    const updatedList = [...historyLogs, freshDay];
+    this.logsSubject.next(updatedList);
+
+    try {
+      const todayDocRef = doc(this.firestore, `users/${userId}/daily_logs/${todayStr}`);
+      await setDoc(todayDocRef, freshDay, { merge: true });
+
+      const userDocRef = doc(this.firestore, `users/${userId}`);
+      await setDoc(userDocRef, { lastActive: new Date().toISOString() }, { merge: true });
+    } catch (err) {
+      console.warn('[DataBridge] Automatic day write error:', err);
+    }
+
+    return freshDay;
   }
 
   /**

@@ -337,6 +337,11 @@ export class PedometerService {
         const data = JSON.parse(raw);
         if (data.date === this.currentDateStr && typeof data.steps === 'number') {
           this.currentSteps.set(data.steps);
+        } else if (data.date !== this.currentDateStr) {
+          // Midnight has passed: automatically start today's fresh counter at 0
+          this.currentSteps.set(0);
+          this.activeCadence.set(0);
+          this.persistStepCount(0);
         }
       }
     } catch {}
