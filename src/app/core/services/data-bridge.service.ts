@@ -277,6 +277,28 @@ export class DataBridgeService {
    * Seeds a realistic 30-day chronological timeline of biometrics directly into Firestore.
    */
   public async seed30DayHistory(userId: string): Promise<DailyBiometricLog[]> {
+    // Ensure the parent users/{userId} document exists with baseline physiology
+    try {
+      const userDocRef = doc(this.firestore, `users/${userId}`);
+      await setDoc(
+        userDocRef,
+        {
+          uid: userId,
+          displayName: userId === 'pilot_athlete_01' ? 'Pilot Athlete' : 'Vagus Athlete',
+          lastActive: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          baseline: { ...this.userBaseline },
+          settings: {
+            dailyStepGoal: 10000,
+            metricUnits: true,
+          },
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.warn('[DataBridge] Parent user document write error:', err);
+    }
+
     const seededLogs: DailyBiometricLog[] = [];
     const now = new Date();
 
