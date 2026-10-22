@@ -226,6 +226,228 @@
       </div>
     </section>
 
+    <!-- POLAR CHEST STRAP & BLUETOOTH ECG TELEMETRY BLOCK -->
+    <section class="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950/30 to-slate-950 border border-indigo-900/40 shadow-lg relative overflow-hidden">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <!-- Bluetooth Status Indicator -->
+          <div
+            class="w-2.5 h-2.5 rounded-full"
+            [ngClass]="bleHR.isConnected() ? 'bg-indigo-400 animate-pulse' : (bleHR.isConnecting() ? 'bg-amber-400 animate-ping' : 'bg-slate-600')"
+          ></div>
+          <span class="text-[11px] font-mono uppercase tracking-wider font-semibold text-slate-300 flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-indigo-400" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M14.24 12.015l5.225-5.225a1 1 0 0 0 0-1.414L14.77.681a1 1 0 0 0-1.707.707v7.586L8.777 4.688a1 1 0 1 0-1.414 1.414l5.353 5.353-5.353 5.354a1 1 0 1 0 1.414 1.414l4.286-4.287v7.587a1 1 0 0 0 1.707.707l4.695-4.695a1 1 0 0 0 0-1.414l-4.225-4.226zM15.063 4.51l2.485 2.485-2.485 2.486V4.51zm0 14.789v-4.971l2.485 2.485-2.485 2.486z"/>
+            </svg>
+            POLAR CHEST STRAP // DIRECT BLE ECG
+          </span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Battery indicator if available -->
+          <span
+            *ngIf="bleHR.batteryLevel() !== null"
+            class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1"
+          >
+            🔋 {{ bleHR.batteryLevel() }}%
+          </span>
+
+          <span
+            class="text-[9px] font-mono px-2 py-0.5 rounded-full border"
+            [ngClass]="bleHR.isConnected() ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-300' : 'bg-slate-800/60 border-slate-700 text-slate-400'"
+          >
+            {{ bleHR.isConnected() ? (bleHR.deviceName() || 'CONNECTED') : (bleHR.isConnecting() ? 'SCANNING...' : 'DISCONNECTED') }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Error / Browser Notice Banner -->
+      <div
+        *ngIf="bleHR.errorMessage()"
+        class="mb-3 p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/50 text-[11px] font-mono text-rose-300 flex items-center justify-between"
+      >
+        <span class="truncate mr-2">{{ bleHR.errorMessage() }}</span>
+        <button
+          type="button"
+          (click)="bleHR.errorMessage.set(null)"
+          class="shrink-0 px-2 py-0.5 rounded bg-rose-900/50 text-rose-200 text-[10px]"
+        >
+          DISMISS
+        </button>
+      </div>
+
+      <!-- State A: Disconnected State -->
+      <div *ngIf="!bleHR.isConnected()" class="space-y-3">
+        <p class="text-xs text-slate-400 font-sans leading-relaxed">
+          Connect your <strong class="text-slate-200">Polar H10 / H9</strong> directly via Bluetooth LE. Ingests millisecond-level R-R intervals (<span class="font-mono text-indigo-300">0x2A37</span>) directly into the local Vagus engine with zero external apps or accounts.
+        </p>
+
+        <button
+          type="button"
+          (click)="togglePolarConnection()"
+          [disabled]="bleHR.isConnecting()"
+          class="w-full py-3 px-4 rounded-xl font-mono text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white shadow-md active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+        >
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M14.24 12.015l5.225-5.225a1 1 0 0 0 0-1.414L14.77.681a1 1 0 0 0-1.707.707v7.586L8.777 4.688a1 1 0 1 0-1.414 1.414l5.353 5.353-5.353 5.354a1 1 0 1 0 1.414 1.414l4.286-4.287v7.587a1 1 0 0 0 1.707.707l4.695-4.695a1 1 0 0 0 0-1.414l-4.225-4.226zM15.063 4.51l2.485 2.485-2.485 2.486V4.51zm0 14.789v-4.971l2.485 2.485-2.485 2.486z"/>
+          </svg>
+          <span>{{ bleHR.isConnecting() ? 'SCANNING FOR POLAR STRAP...' : 'PAIR POLAR CHEST STRAP' }}</span>
+        </button>
+      </div>
+
+      <!-- State B: Connected State -->
+      <div *ngIf="bleHR.isConnected()" class="space-y-4">
+        <!-- Live Cardiac HUD -->
+        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800">
+          <div class="flex items-center gap-3">
+            <div class="cardiac-beat text-2xl">❤️</div>
+            <div>
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-3xl font-mono font-bold text-white">{{ bleHR.liveBpm() }}</span>
+                <span class="text-xs font-mono text-slate-400">BPM</span>
+              </div>
+              <div class="text-[10px] font-mono text-slate-500">
+                LAST R-R: <span class="text-indigo-300 font-semibold">{{ bleHR.lastRRIntervalMs() ? (bleHR.lastRRIntervalMs() + ' ms') : '--' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            (click)="togglePolarConnection()"
+            class="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-rose-400 text-[10px] font-mono transition-colors"
+          >
+            DISCONNECT
+          </button>
+        </div>
+
+        <!-- 1. Morning Readiness Scan Subcard -->
+        <div class="p-3.5 rounded-xl bg-indigo-950/20 border border-indigo-900/50 space-y-3">
+          <div class="flex items-center justify-between font-mono">
+            <div>
+              <div class="text-xs font-bold text-indigo-300 uppercase tracking-wide">MORNING READINESS SCAN</div>
+              <div class="text-[10px] text-slate-400">60-second resting ECG to record clinical RMSSD & Recovery %</div>
+            </div>
+            <div *ngIf="bleHR.scanSession().isActive" class="text-sm font-bold text-cyan-400">
+              {{ bleHR.scanSession().remainingSeconds }}s REMAINING
+            </div>
+          </div>
+
+          <!-- While Scan is INACTIVE -->
+          <div *ngIf="!bleHR.scanSession().isActive" class="flex gap-2">
+            <button
+              type="button"
+              (click)="startMorningReadinessScan(60)"
+              class="flex-1 py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-semibold uppercase tracking-wider transition-all"
+            >
+              START 60s SCAN
+            </button>
+            <button
+              type="button"
+              (click)="startMorningReadinessScan(120)"
+              class="py-2 px-3 rounded-lg bg-indigo-950/60 hover:bg-indigo-900/60 border border-indigo-800 text-indigo-200 font-mono text-xs transition-colors"
+            >
+              120s SCAN
+            </button>
+          </div>
+
+          <!-- While Scan IS ACTIVE -->
+          <div *ngIf="bleHR.scanSession().isActive" class="space-y-3 pt-1">
+            <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                class="h-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-emerald-400 transition-all duration-1000 ease-linear"
+                [style.width.%]="((bleHR.scanSession().durationSeconds - bleHR.scanSession().remainingSeconds) / bleHR.scanSession().durationSeconds) * 100"
+              ></div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 font-mono text-center text-xs">
+              <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
+                <div class="text-[9px] text-slate-400 uppercase">BEATS</div>
+                <div class="font-bold text-slate-100 mt-0.5">{{ bleHR.scanSession().capturedRRIntervals.length }}</div>
+              </div>
+              <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
+                <div class="text-[9px] text-slate-400 uppercase">LIVE RMSSD</div>
+                <div class="font-bold text-emerald-400 mt-0.5">{{ bleHR.scanSession().currentRMSSD }} ms</div>
+              </div>
+              <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
+                <div class="text-[9px] text-slate-400 uppercase">MEAN RHR</div>
+                <div class="font-bold text-cyan-400 mt-0.5">{{ bleHR.scanSession().meanBpm }} bpm</div>
+              </div>
+            </div>
+
+            <div class="p-2 rounded-lg bg-indigo-900/30 border border-indigo-800/40 text-center font-mono text-[10px] text-indigo-300">
+              🌬️ Inhale 4s ... Exhale 4s. Stay still and relaxed.
+            </div>
+
+            <div class="flex gap-2">
+              <button
+                type="button"
+                (click)="stopMorningReadinessScan(true)"
+                class="flex-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-semibold uppercase tracking-wider transition-colors"
+              >
+                COMPLETE & SAVE NOW
+              </button>
+              <button
+                type="button"
+                (click)="stopMorningReadinessScan(false)"
+                class="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 font-mono text-xs transition-colors"
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Live Workout Strain Subcard -->
+        <div class="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between font-mono">
+            <div>
+              <div class="text-xs font-bold text-cyan-300 uppercase tracking-wide">WORKOUT STRAIN TRACKER</div>
+              <div class="text-[10px] text-slate-400">Stream cardiac load to accumulate Banister TRIMP in real time</div>
+            </div>
+            <div *ngIf="bleHR.workoutSession().isActive" class="text-xs font-bold text-emerald-400 font-mono">
+              RECORDING
+            </div>
+          </div>
+
+          <div *ngIf="!bleHR.workoutSession().isActive">
+            <button
+              type="button"
+              (click)="toggleWorkoutTracker()"
+              class="w-full py-2 px-3 rounded-lg bg-cyan-600/30 hover:bg-cyan-600/40 border border-cyan-500/40 text-cyan-200 font-mono text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              START WORKOUT SESSION
+            </button>
+          </div>
+
+          <div *ngIf="bleHR.workoutSession().isActive" class="space-y-3">
+            <div class="grid grid-cols-3 gap-2 font-mono text-center text-xs">
+              <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
+                <div class="text-[9px] text-slate-400 uppercase">DURATION</div>
+                <div class="font-bold text-slate-100 mt-0.5">{{ formatMinutesToHours(bleHR.workoutSession().elapsedSeconds / 60) }}</div>
+              </div>
+              <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
+                <div class="text-[9px] text-slate-400 uppercase">MAX HR</div>
+                <div class="font-bold text-rose-400 mt-0.5">{{ bleHR.workoutSession().maxBpm }} bpm</div>
+              </div>
+              <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
+                <div class="text-[9px] text-slate-400 uppercase">STRAIN ADDED</div>
+                <div class="font-bold text-cyan-400 mt-0.5">+{{ bleHR.workoutSession().accumulatedStrain }}</div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              (click)="toggleWorkoutTracker()"
+              class="w-full py-2 px-3 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-mono text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              FINISH WORKOUT & COMMIT STRAIN
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- LIVE DUAL-OS STEP TELEMETRY BLOCK (AUTOMATIC IOS & ANDROID) -->
     <section class="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800/90 shadow-md">
       <div class="flex items-center justify-between mb-3">

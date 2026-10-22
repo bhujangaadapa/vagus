@@ -4,6 +4,7 @@ import { AuthService } from '../../services/auth.service';
 import { DataBridgeService } from '../../services/data-bridge.service';
 import { PhysicsEngineService } from '../../services/physics-engine.service';
 import { PedometerService } from '../../services/pedometer.service';
+import { BleHeartRateService } from '../../services/ble-heart-rate.service';
 import { DailyBiometricLog, JournalHabits } from '../../models/biometrics.interface';
 
 @Component({
@@ -18,6 +19,7 @@ export class DashboardComponent implements OnInit {
   private readonly dataBridge = inject(DataBridgeService);
   private readonly physicsEngine = inject(PhysicsEngineService);
   public readonly pedometer = inject(PedometerService);
+  public readonly bleHR = inject(BleHeartRateService);
 
   // Active user ID derived from Auth state
   public readonly activeUserId = computed(() => {
@@ -88,9 +90,10 @@ export class DashboardComponent implements OnInit {
   });
 
   constructor() {
-    // Whenever active user changes, reload daily logs
+    // Whenever active user changes, sync DataBridge and reload daily logs
     effect(() => {
       const uid = this.activeUserId();
+      this.dataBridge.setActiveUserId(uid);
       this.dataBridge.getDailyLogs(uid).subscribe((logs) => {
         this.historyLogs.set(logs);
         if (logs.length > 0) {
@@ -185,6 +188,30 @@ export class DashboardComponent implements OnInit {
       { [habitKey]: !currentValue }
     );
     this.todayLog.set(updated);
+  }
+
+  public async togglePolarConnection(): Promise<void> {
+    if (this.bleHR.isConnected()) {
+      this.bleHR.disconnect();
+    } else {
+      await this.bleHR.connect();
+    }
+  }
+
+  public startMorningReadinessScan(duration: number = 60): void {
+    this.bleHR.startReadinessScan(duration);
+  }
+
+  public stopMorningReadinessScan(save: boolean = true): void {
+    this.bleHR.stopReadinessScan(save);
+  }
+
+  public toggleWorkoutTracker(): void {
+    if (this.bleHR.workoutSession().isActive) {
+      this.bleHR.stopWorkout(true);
+    } else {
+      this.bleHR.startWorkout();
+    }
   }
 
   public formatMinutesToHours(minutes: number): string {

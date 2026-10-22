@@ -32,6 +32,13 @@ export class DataBridgeService {
   private readonly firestore = inject(Firestore);
   private readonly physicsEngine = inject(PhysicsEngineService);
 
+  // Active user id
+  private activeUserId: string = 'pilot_athlete_01';
+
+  public setActiveUserId(userId: string): void {
+    this.activeUserId = userId;
+  }
+
   // Default baseline physiology parameters
   private readonly userBaseline: UserPhysiologyBaseline = {
     baselineRMSSD: 58.0,
@@ -427,6 +434,159 @@ export class DataBridgeService {
     } catch {
       // Local fallback
     }
+  }
+
+  /**
+   * Record Polar / Bluetooth Morning Readiness Scan
+   * Ingests medical-grade measured RMSSD and RHR, recalculates recovery,
+   * autonomic steering index, and commits to Firestore.
+   */
+  public async recordReadinessScan(
+    measuredRMSSD: number,
+    measuredRHR: number,
+    userId?: string
+  ): Promise<DailyBiometricLog | null> {
+    const targetUid = userId || this.activeUserId;
+    const todayStr = this.getFormattedDate(new Date());
+    const currentList = this.logsSubject.value;
+    const existingIndex = currentList.findIndex((item) => item.date === todayStr);
+
+    let baseLog: DailyBiometricLog;
+    if (existingIndex >= 0) {
+      baseLog = JSON.parse(JSON.stringify(currentList[existingIndex]));
+    } else if (this.todayLogSubject.value) {
+      baseLog = JSON.parse(JSON.stringify(this.todayLogSubject.value));
+      baseLog.date = todayStr;
+    } else {
+      baseLog = this.generateSyntheticDay(todayStr, 0, []);
+    }
+
+    baseLog.biometrics.overnightRMSSD = measuredRMSSD;
+    baseLog.biometrics.restingHR = measuredRHR;
+
+    // Recalculate Recovery via Physics Engine
+    const recalculatedRecovery = this.physicsEngine.computeDailyRecoveryPercent(
+      measuredRMSSD,
+      this.userBaseline.baselineRMSSD,
+      measuredRHR,
+      this.userBaseline.baselineRHR
+    );
+
+    // Recalculate Autonomic Steering
+    const recalculatedSteering = this.physicsEngine.calculateAutonomicSteering(
+      measuredRMSSD,
+      measuredRHR
+    );
+
+    // Recalculate Sleep Efficiency if sleep exists
+    if (baseLog.biometrics.sleepMinutes > 0) {
+      baseLog.advancedKPIs.sleepEfficiencyCoefficient = this.physicsEngine.calculateSleepEfficiency(
+        baseLog.biometrics.deepSleepMinutes,
+        baseLog.biometrics.remSleepMinutes,
+        baseLog.biometrics.sleepMinutes,
+        measuredRHR,
+        baseLog.biometrics.avgSleepHR || measuredRHR
+      );
+    }
+
+    baseLog.scores.calculatedRecovery = recalculatedRecovery;
+    baseLog.advancedKPIs.autonomicSteeringIndex = recalculatedSteering;
+    baseLog.updatedAt = new Date().toISOString();
+
+    // Recalculate 7-day fatigue drag
+    const historyLogs = currentList.filter((l) => l.date !== todayStr);
+    const rolling7 = [...historyLogs.slice(-6), baseLog].map((l) => ({
+      strain: l.scores.calculatedStrain,
+      recovery: l.scores.calculatedRecovery,
+    }));
+    baseLog.advancedKPIs.cumulativeFatigueDrag = this.physicsEngine.calculateFatigueDrag(rolling7);
+
+    // Update local cache
+    const updatedList = [...currentList];
+    if (existingIndex >= 0) {
+      updatedList[existingIndex] = baseLog;
+    } else {
+      updatedList.push(baseLog);
+    }
+    this.logsSubject.next(updatedList);
+    this.todayLogSubject.next(baseLog);
+
+    // Persist to Firestore
+    try {
+      const docRef = doc(this.firestore, `users/${targetUid}/daily_logs/${todayStr}`);
+      await setDoc(docRef, baseLog, { merge: true });
+    } catch (err) {
+      console.warn('[DataBridge] Firestore write error for readiness scan:', err);
+    }
+
+    return baseLog;
+  }
+
+  /**
+   * Accumulate Live Workout Strain into Today's Log using non-linear TRIMP summation
+   */
+  public async accumulateWorkoutStrain(
+    workoutStrain: number,
+    userId?: string
+  ): Promise<DailyBiometricLog | null> {
+    const targetUid = userId || this.activeUserId;
+    const todayStr = this.getFormattedDate(new Date());
+    const currentList = this.logsSubject.value;
+    const existingIndex = currentList.findIndex((item) => item.date === todayStr);
+
+    let baseLog: DailyBiometricLog;
+    if (existingIndex >= 0) {
+      baseLog = JSON.parse(JSON.stringify(currentList[existingIndex]));
+    } else if (this.todayLogSubject.value) {
+      baseLog = JSON.parse(JSON.stringify(this.todayLogSubject.value));
+      baseLog.date = todayStr;
+    } else {
+      return null;
+    }
+
+    const currentStrain = baseLog.scores.calculatedStrain;
+
+    // Convert existing strain to TRIMP: TRIMP = -25 * ln(1 - Strain / 21)
+    const clampedCurrent = Math.min(20.95, Math.max(0, currentStrain));
+    const currentTrimp = -25.0 * Math.log(1.0 - clampedCurrent / 21.0);
+
+    const clampedWorkout = Math.min(20.95, Math.max(0, workoutStrain));
+    const workoutTrimp = -25.0 * Math.log(1.0 - clampedWorkout / 21.0);
+
+    const totalTrimp = currentTrimp + workoutTrimp;
+    const combinedStrain = 21.0 * (1.0 - Math.exp(-totalTrimp / 25.0));
+    const finalStrain = Math.round(Math.min(21.0, Math.max(0.0, combinedStrain)) * 10) / 10;
+
+    baseLog.scores.calculatedStrain = finalStrain;
+    baseLog.updatedAt = new Date().toISOString();
+
+    // Recalculate 7-day fatigue drag
+    const historyLogs = currentList.filter((l) => l.date !== todayStr);
+    const rolling7 = [...historyLogs.slice(-6), baseLog].map((l) => ({
+      strain: l.scores.calculatedStrain,
+      recovery: l.scores.calculatedRecovery,
+    }));
+    baseLog.advancedKPIs.cumulativeFatigueDrag = this.physicsEngine.calculateFatigueDrag(rolling7);
+
+    // Update local cache
+    const updatedList = [...currentList];
+    if (existingIndex >= 0) {
+      updatedList[existingIndex] = baseLog;
+    } else {
+      updatedList.push(baseLog);
+    }
+    this.logsSubject.next(updatedList);
+    this.todayLogSubject.next(baseLog);
+
+    // Persist to Firestore
+    try {
+      const docRef = doc(this.firestore, `users/${targetUid}/daily_logs/${todayStr}`);
+      await setDoc(docRef, baseLog, { merge: true });
+    } catch (err) {
+      console.warn('[DataBridge] Firestore write error for workout strain:', err);
+    }
+
+    return baseLog;
   }
 
   /**
