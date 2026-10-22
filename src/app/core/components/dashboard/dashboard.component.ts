@@ -287,7 +287,11 @@ export class DashboardComponent implements OnInit {
   }
 
   public async authorizeIOSMotion(): Promise<void> {
-    await this.pedometer.requestIOSMotionPermission();
+    await this.pedometer.requestNativePermission();
+  }
+
+  public async requestStepPermission(): Promise<void> {
+    await this.pedometer.requestNativePermission();
   }
 
   public simulateTestSteps(): void {

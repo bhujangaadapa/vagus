@@ -64,6 +64,24 @@ export class PedometerService {
       });
     }
 
+    // Direct Android Hardware Step Sensor Listener (Dispatched from native MainActivity)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('androidHardwareStep', (event: any) => {
+        if (event && event.detail && typeof event.detail.steps === 'number') {
+          const steps = event.detail.steps;
+          if (steps >= 0) {
+            this.currentSteps.set(steps);
+            this.persistStepCount(steps);
+            this.dataBridge.updateLiveSteps(this.currentUserId, this.currentDateStr, steps);
+            this.activeEngine.set('ANDROID_HARDWARE_PEDOMETER');
+            this.isTracking.set(true);
+            this.permissionState.set('GRANTED');
+            this.statusMessage.set('Hardware Step Sensor: Active');
+          }
+        }
+      });
+    }
+
     // Auto-start tracking on initialization like StepUp
     this.autoStartTracking();
   }
@@ -95,6 +113,22 @@ export class PedometerService {
     if (dateStr) this.currentDateStr = dateStr;
 
     const isNative = Capacitor.isNativePlatform();
+
+    // 0. Direct Android Hardware Sensor Bridge (reads low-power Sensor.TYPE_STEP_COUNTER from phone hardware)
+    const bridge = typeof window !== 'undefined' ? (window as any).AndroidHardwarePedometer : null;
+    if (bridge && typeof bridge.getLiveSteps === 'function') {
+      const steps = bridge.getLiveSteps();
+      if (steps >= 0) {
+        this.currentSteps.set(steps);
+        this.persistStepCount(steps);
+        this.dataBridge.updateLiveSteps(this.currentUserId, this.currentDateStr, steps);
+        this.activeEngine.set('ANDROID_HARDWARE_PEDOMETER');
+        this.isTracking.set(true);
+        this.permissionState.set('GRANTED');
+        this.statusMessage.set('Hardware Step Sensor Active');
+        return true;
+      }
+    }
 
     // 1. Native iOS / Android Capacitor Layer
     if (isNative) {
@@ -219,6 +253,34 @@ export class PedometerService {
     this.isTracking.set(true);
     this.statusMessage.set(`Auto-sync active via ${this.platformLabel()}`);
     return true;
+  }
+
+  /**
+   * Request Native Android Activity Recognition & iOS CoreMotion Permission
+   */
+  public async requestNativePermission(): Promise<boolean> {
+    if (Capacitor.isNativePlatform()) {
+      const bridge = typeof window !== 'undefined' ? (window as any).AndroidHardwarePedometer : null;
+      if (bridge && typeof bridge.requestPermission === 'function') {
+        bridge.requestPermission();
+      }
+
+      try {
+        const requested = await CapacitorPedometer.requestPermissions();
+        if (requested.activityRecognition === 'granted') {
+          this.permissionState.set('GRANTED');
+          return this.initializeNativePedometer();
+        } else {
+          this.permissionState.set('DENIED');
+          this.statusMessage.set('Physical activity permission denied in Android Settings.');
+          return false;
+        }
+      } catch (e) {
+        console.warn('[PedometerService] Request permission error:', e);
+        return false;
+      }
+    }
+    return this.requestIOSMotionPermission();
   }
 
   /**

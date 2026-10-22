@@ -625,17 +625,40 @@
         </div>
       </section>
 
-      <!-- Footsteps & Movement Telemetry -->
+      <!-- Footsteps & Movement Telemetry (Direct Phone Hardware Sensor) -->
       <section class="whoop-surface p-5 rounded-3xl space-y-3 font-mono">
         <div class="flex items-center justify-between">
-          <div class="text-xs font-bold text-white uppercase tracking-wider">FOOTSTEPS TELEMETRY</div>
-          <span class="text-[10px] text-[#00F5A0] font-bold">{{ stepProgressPercent() }}% GOAL</span>
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full" [ngClass]="pedometer.isTracking() ? 'bg-[#00F5A0] shadow-[0_0_8px_#00F5A0] animate-pulse' : 'bg-amber-400'"></span>
+            <div class="text-xs font-bold text-white uppercase tracking-wider">PHONE HARDWARE STEP SENSOR</div>
+          </div>
+          <span class="text-[9px] px-2 py-0.5 rounded-full border font-bold" [ngClass]="pedometer.isTracking() ? 'bg-[#00F5A0]/15 text-[#00F5A0] border-[#00F5A0]/30' : 'bg-amber-500/15 text-amber-300 border-amber-500/30'">
+            {{ pedometer.activeEngine() === 'ANDROID_HARDWARE_PEDOMETER' ? 'HARDWARE ACTIVE' : pedometer.activeEngine() }}
+          </span>
+        </div>
+
+        <!-- Android Permission Button if needed -->
+        <div *ngIf="pedometer.permissionState() !== 'GRANTED'" class="p-3 rounded-2xl bg-cyan-950/40 border border-cyan-800/60 flex items-center justify-between font-sans">
+          <div class="leading-tight">
+            <div class="text-[11px] font-bold text-cyan-300 font-mono">ALLOW ANDROID STEP ACCESS</div>
+            <div class="text-[9px] text-zinc-400">Tap to authorize your phone's physical activity sensor.</div>
+          </div>
+          <button
+            type="button"
+            (click)="requestStepPermission()"
+            class="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono font-bold text-[10px] uppercase transition-colors cursor-pointer shrink-0"
+          >
+            AUTHORIZE
+          </button>
         </div>
 
         <div class="flex items-baseline justify-between">
-          <div class="text-3xl font-sans font-black text-white">
+          <div class="text-4xl font-sans font-black text-white">
             {{ liveSteps() | number }}
             <span class="text-xs font-mono text-zinc-500 font-normal">/ {{ stepGoal() | number }} steps</span>
+          </div>
+          <div class="text-right">
+            <span class="text-xs font-mono font-bold text-[#00F5A0]">{{ stepProgressPercent() }}%</span>
           </div>
         </div>
 
@@ -658,21 +681,14 @@
           </div>
         </div>
 
-        <div class="flex gap-2 pt-2">
+        <div class="flex items-center justify-between pt-1 text-[10px] text-zinc-500">
+          <span class="truncate">{{ pedometer.statusMessage() }}</span>
           <button
             type="button"
             (click)="openStepSyncModal()"
-            class="flex-1 py-2 px-3 rounded-xl bg-cyan-600/30 hover:bg-cyan-600/40 border border-cyan-500/40 text-cyan-200 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+            class="text-cyan-400 hover:text-cyan-300 underline font-mono cursor-pointer shrink-0 ml-2"
           >
-            🔄 SYNC FROM STEPUP / HEALTH
-          </button>
-          <button
-            type="button"
-            (click)="simulateTestSteps()"
-            class="py-2 px-3 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-zinc-300 text-xs transition-colors"
-            title="Simulate 25 walking strides"
-          >
-            +25
+            Manual Adjustment
           </button>
         </div>
       </section>
