@@ -1,8 +1,15 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { Auth, GoogleAuthProvider, signInWithPopup, signOut, authState, User } from '@angular/fire/auth';
-import { Firestore, doc, getDoc, setDoc, docData } from '@angular/fire/firestore';
-import { Observable, of } from 'rxjs';
-import { switchMap, tap } from 'rxjs/operators';
+import {
+  Auth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  signOut,
+  authState,
+  User,
+} from '@angular/fire/auth';
+import { Firestore, doc, getDoc, setDoc } from '@angular/fire/firestore';
 import { UserProfileDocument, UserPhysiologyBaseline } from '../models/biometrics.interface';
 
 @Injectable({
@@ -25,7 +32,19 @@ export class AuthService {
   };
 
   constructor() {
-    // Track authentication state changes
+    // Check if user was redirected back from Google OAuth
+    getRedirectResult(this.auth)
+      .then(async (result) => {
+        if (result && result.user) {
+          this.currentUser.set(result.user);
+          await this.maintainUserDocument(result.user);
+        }
+      })
+      .catch((err) => {
+        console.warn('[AuthService] Redirect result handler:', err);
+      });
+
+    // Track real-time authentication state
     authState(this.auth).subscribe(async (user) => {
       this.currentUser.set(user);
       if (user) {
@@ -37,7 +56,7 @@ export class AuthService {
   }
 
   /**
-   * Authenticate with Google
+   * Authenticate with Google (Opens real Google Account Picker)
    */
   public async loginWithGoogle(): Promise<User | null> {
     this.isLoading.set(true);
@@ -54,25 +73,23 @@ export class AuthService {
       return user;
     } catch (err: unknown) {
       const error = err as { code?: string; message?: string };
-      console.warn('[AuthService] Google Sign-In Popup failed or blocked:', error);
+      console.warn('[AuthService] Google Sign-In error:', error);
 
-      // Handle common Firebase Auth errors gracefully in development
-      if (error.code === 'auth/popup-closed-by-user') {
-        this.authError.set('Sign-in cancelled by user.');
-      } else if (
-        error.code === 'auth/unauthorized-domain' ||
-        error.code === 'auth/invalid-api-key' ||
-        error.code?.includes('api-key') ||
-        error.message?.includes('api-key-not-valid')
-      ) {
-        if (error.code === 'auth/unauthorized-domain') {
-          this.authError.set('Domain authorization pending in Firebase Console. Switched to athlete session.');
-        } else {
-          this.authError.set(null);
+      if (error.code === 'auth/popup-blocked') {
+        // Mobile browsers often block popups; fallback to direct redirect
+        try {
+          await signInWithRedirect(this.auth, provider);
+          return null;
+        } catch (redirectErr: unknown) {
+          const rErr = redirectErr as { message?: string };
+          this.authError.set(rErr.message || 'Redirect error.');
         }
-        return this.createSimulatedSession();
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        this.authError.set('Google sign-in popup was closed before completing.');
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        // User clicked twice; ignore
       } else {
-        this.authError.set(error.message || 'Authentication error.');
+        this.authError.set(error.message || 'Google authentication error.');
       }
       return null;
     } finally {
@@ -81,7 +98,7 @@ export class AuthService {
   }
 
   /**
-   * Fast 1-click athlete session for instant testing
+   * Explicit Demo Athlete Login (only when clicking the Demo button)
    */
   public async loginAsDemoAthlete(): Promise<User> {
     this.authError.set(null);
@@ -89,8 +106,7 @@ export class AuthService {
   }
 
   /**
-   * Maintain the user document in Firestore: users/{userId}
-   * Ensures the document exists and updates lastLoginAt
+   * Maintain user document in Firestore: users/{userId}
    */
   public async maintainUserDocument(user: User): Promise<UserProfileDocument> {
     const userDocRef = doc(this.firestore, `users/${user.uid}`);
@@ -109,7 +125,6 @@ export class AuthService {
           lastLoginAt: new Date().toISOString(),
         };
       } else {
-        // Initialize new user profile
         profileData = {
           uid: user.uid,
           email: user.email,
@@ -127,8 +142,7 @@ export class AuthService {
 
       await setDoc(userDocRef, profileData, { merge: true });
     } catch (err) {
-      console.warn('[AuthService] Firestore user doc write bypassed, using memory profile:', err);
-      // Fallback in-memory profile
+      console.warn('[AuthService] Firestore user doc write error:', err);
       profileData = {
         uid: user.uid,
         email: user.email,
@@ -162,13 +176,10 @@ export class AuthService {
     this.authError.set(null);
   }
 
-  /**
-   * Helper: simulated session if Firebase keys are in demo mode
-   */
   private async createSimulatedSession(): Promise<User> {
     const mockUser = {
       uid: 'google_user_vagus_athlete',
-      email: 'athlete@vagus.health',
+      email: 'pilot@vagus.health',
       displayName: 'Google Pilot Athlete',
       photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces',
     } as unknown as User;
