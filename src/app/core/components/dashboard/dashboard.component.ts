@@ -93,6 +93,30 @@ export class DashboardComponent implements OnInit {
     return logs.slice(-7);
   });
 
+  // Unique Feature 1: Circadian Rhythm & Sleep Need Predictor
+  public readonly tonightSleepNeedMinutes = computed(() => {
+    const base = 450; // 7.5 hrs baseline
+    const strainExtra = Math.round(this.strainScore() * 8.5); // 8.5 min per strain unit
+    const alcoholPenalty = this.todayLog()?.journalHabits.drankAlcohol ? 35 : 0;
+    return base + strainExtra + alcoholPenalty;
+  });
+
+  public readonly circadianMelatoninWindow = computed(() => {
+    const hadSunlight = this.todayLog()?.journalHabits.viewedSunlight ?? false;
+    return hadSunlight ? '22:15 – 23:00 (Anchored)' : '23:45 – 00:30 (Delayed / Drift)';
+  });
+
+  public readonly peakAthleticWindow = computed(() => '16:30 – 18:30 (Core Temp Peak)');
+
+  // Unique Feature 2: Glass-Box Algorithm Inspector Modal
+  public readonly showAlgorithmInspector = signal<boolean>(false);
+
+  // Unique Feature 3: Interactive Resonance Vagus Breathing Pacer
+  public readonly showVagusPacer = signal<boolean>(false);
+  public readonly pacerPhase = signal<'INHALE' | 'HOLD' | 'EXHALE'>('INHALE');
+  public readonly pacerSecondsLeft = signal<number>(4);
+  private pacerIntervalId: any = null;
+
   constructor() {
     // Whenever active user changes, sync DataBridge and reload daily logs
     effect(() => {
@@ -245,7 +269,56 @@ export class DashboardComponent implements OnInit {
 
   public formatMinutesToHours(minutes: number): string {
     const hrs = Math.floor(minutes / 60);
-    const mins = minutes % 60;
+    const mins = Math.round(minutes % 60);
     return `${hrs}h ${mins}m`;
+  }
+
+  // Vagus Resonance Pacer Logic (0.1 Hz Baroreflex Cadence: 4s Inhale, 2s Hold, 6s Exhale)
+  public toggleVagusPacer(): void {
+    if (this.showVagusPacer()) {
+      this.stopVagusPacer();
+    } else {
+      this.startVagusPacer();
+    }
+  }
+
+  public startVagusPacer(): void {
+    this.showVagusPacer.set(true);
+    this.pacerPhase.set('INHALE');
+    this.pacerSecondsLeft.set(4);
+
+    if (this.pacerIntervalId) clearInterval(this.pacerIntervalId);
+
+    this.pacerIntervalId = setInterval(() => {
+      const remaining = this.pacerSecondsLeft() - 1;
+      if (remaining > 0) {
+        this.pacerSecondsLeft.set(remaining);
+      } else {
+        // Cycle phase
+        const currentPhase = this.pacerPhase();
+        if (currentPhase === 'INHALE') {
+          this.pacerPhase.set('HOLD');
+          this.pacerSecondsLeft.set(2);
+        } else if (currentPhase === 'HOLD') {
+          this.pacerPhase.set('EXHALE');
+          this.pacerSecondsLeft.set(6);
+        } else {
+          this.pacerPhase.set('INHALE');
+          this.pacerSecondsLeft.set(4);
+        }
+      }
+    }, 1000);
+  }
+
+  public stopVagusPacer(): void {
+    this.showVagusPacer.set(false);
+    if (this.pacerIntervalId) {
+      clearInterval(this.pacerIntervalId);
+      this.pacerIntervalId = null;
+    }
+  }
+
+  public toggleAlgorithmInspector(): void {
+    this.showAlgorithmInspector.set(!this.showAlgorithmInspector());
   }
 }

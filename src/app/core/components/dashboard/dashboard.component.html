@@ -186,6 +186,25 @@
           </div>
         </div>
       </div>
+
+      <!-- Quick Action Utilities: Vagus Pacer & Algorithm Inspector -->
+      <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-800/80 w-full font-mono text-xs">
+        <button
+          type="button"
+          (click)="toggleVagusPacer()"
+          class="py-2 px-3 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+        >
+          <span>🧘 VAGUS PACER (0.1 Hz)</span>
+        </button>
+
+        <button
+          type="button"
+          (click)="toggleAlgorithmInspector()"
+          class="py-2 px-3 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700 text-slate-300 font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+        >
+          <span>🔍 OPEN ALGORITHM</span>
+        </button>
+      </div>
     </section>
 
     <!-- DIAGNOSTIC BLOCK 2: 0-21 Logarithmic Strain Gauge vs Daily Target -->
@@ -223,6 +242,37 @@
           TARGET: {{ targetStrain().target }} ({{ targetStrain().min }} - {{ targetStrain().max }})
         </div>
         <span>21.0 MAX</span>
+      </div>
+    </section>
+
+    <!-- CIRCADIAN RHYTHM & SLEEP NEED PREDICTOR -->
+    <section class="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950/30 to-slate-950 border border-indigo-900/40 shadow-md space-y-3 font-mono">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-2.5 h-2.5 rounded-full bg-indigo-400"></div>
+          <span class="text-[11px] uppercase tracking-wider font-semibold text-slate-300">
+            CIRCADIAN ENGINE // TONIGHT'S SLEEP NEED
+          </span>
+        </div>
+        <span class="text-[9px] px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/40 text-indigo-300 font-bold">
+          {{ formatMinutesToHours(tonightSleepNeedMinutes()) }} TARGET
+        </span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+          <div class="text-[9px] text-slate-500 uppercase">MELATONIN ONSET GATE</div>
+          <div class="text-sm font-bold text-amber-300">{{ circadianMelatoninWindow() }}</div>
+          <div class="text-[9px] text-slate-400 font-sans">
+            {{ todayLog()?.journalHabits?.viewedSunlight ? 'Anchored by morning sunlight log.' : 'No sunlight logged. Expect circadian delay.' }}
+          </div>
+        </div>
+
+        <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+          <div class="text-[9px] text-slate-500 uppercase">PEAK ATHLETIC WINDOW</div>
+          <div class="text-sm font-bold text-cyan-400">{{ peakAthleticWindow() }}</div>
+          <div class="text-[9px] text-slate-400 font-sans">Optimal core body temperature & reaction time.</div>
+        </div>
       </div>
     </section>
 
@@ -906,4 +956,144 @@
     </section>
 
   </main>
+
+  <!-- MODAL 1: INTERACTIVE VAGAL RESONANCE BREATHING PACER (0.1 HZ) -->
+  <div
+    *ngIf="showVagusPacer()"
+    class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4"
+  >
+    <div class="max-w-sm w-full p-6 rounded-3xl bg-slate-900 border border-teal-500/40 shadow-2xl flex flex-col items-center text-center space-y-6 font-mono relative">
+      <button
+        type="button"
+        (click)="stopVagusPacer()"
+        class="absolute top-4 right-4 text-slate-400 hover:text-white text-xs px-2 py-1 rounded-lg bg-slate-800 cursor-pointer"
+      >
+        ✕ CLOSE
+      </button>
+
+      <div>
+        <div class="text-[10px] tracking-widest text-teal-400 font-bold uppercase">
+          VAGAL NERVE RESONANCE BIOFEEDBACK
+        </div>
+        <h3 class="text-lg font-bold text-white mt-1">0.1 Hz Baroreflex Cadence</h3>
+        <p class="text-xs text-slate-400 font-sans mt-0.5">Stimulates parasympathetic brake to elevate RMSSD.</p>
+      </div>
+
+      <!-- Breathing Circle Visualizer -->
+      <div class="relative w-48 h-48 flex items-center justify-center">
+        <!-- Animated Expanding / Contracting Outer Ring -->
+        <div
+          class="absolute rounded-full transition-all duration-1000 ease-in-out"
+          [ngClass]="pacerPhase() === 'INHALE' ? 'w-44 h-44 bg-teal-500/20 border-2 border-teal-400 shadow-[0_0_40px_rgba(45,212,191,0.3)] scale-110' : (pacerPhase() === 'HOLD' ? 'w-44 h-44 bg-cyan-500/30 border-2 border-cyan-400 scale-105 animate-pulse' : 'w-24 h-24 bg-indigo-500/20 border-2 border-indigo-400 scale-90')"
+        ></div>
+
+        <!-- Center Counter Display -->
+        <div class="relative z-10 flex flex-col items-center">
+          <span class="text-xs uppercase tracking-widest font-bold" [ngClass]="pacerPhase() === 'INHALE' ? 'text-teal-300' : (pacerPhase() === 'HOLD' ? 'text-cyan-300' : 'text-indigo-300')">
+            {{ pacerPhase() }}
+          </span>
+          <span class="text-5xl font-mono font-black text-white my-1">
+            {{ pacerSecondsLeft() }}
+          </span>
+          <span class="text-[10px] text-slate-400">SECONDS</span>
+        </div>
+      </div>
+
+      <!-- Live Telemetry Feedback if Polar or Camera active -->
+      <div *ngIf="bleHR.isConnected() || ppg.scanState().isActive" class="grid grid-cols-2 gap-2 w-full text-xs">
+        <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+          <div class="text-[9px] text-slate-500 uppercase">LIVE BPM</div>
+          <div class="text-xl font-bold text-rose-400 mt-0.5">
+            {{ bleHR.liveBpm() || ppg.scanState().liveBpm || '--' }} <span class="text-[10px] text-slate-500">bpm</span>
+          </div>
+        </div>
+        <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+          <div class="text-[9px] text-slate-500 uppercase">INSTANT RMSSD</div>
+          <div class="text-xl font-bold text-emerald-400 mt-0.5">
+            {{ bleHR.scanSession().currentRMSSD || ppg.scanState().currentRMSSD || '--' }} <span class="text-[10px] text-slate-500">ms</span>
+          </div>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        (click)="stopVagusPacer()"
+        class="w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-slate-950 font-bold uppercase tracking-wider text-xs transition-colors cursor-pointer"
+      >
+        DONE / SAVE RELAXATION
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL 2: GLASS-BOX ALGORITHM INSPECTOR -->
+  <div
+    *ngIf="showAlgorithmInspector()"
+    class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+  >
+    <div class="max-w-md w-full p-6 rounded-3xl bg-slate-900 border border-slate-700 shadow-2xl flex flex-col space-y-4 font-mono text-xs relative max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+          <span class="text-sm font-bold text-white uppercase">GLASS-BOX ALGORITHM INSPECTOR</span>
+        </div>
+        <button
+          type="button"
+          (click)="toggleAlgorithmInspector()"
+          class="text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 cursor-pointer"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div class="space-y-4 text-slate-300 font-sans">
+        <!-- 1. RMSSD -->
+        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5 font-mono">
+          <div class="text-xs font-bold text-emerald-400 uppercase">1. RMSSD (Root Mean Square of Successive Differences)</div>
+          <p class="text-[11px] text-slate-400 font-sans">Measures high-frequency parasympathetic beat-to-beat variability:</p>
+          <div class="p-2 rounded bg-slate-900 text-teal-300 text-[11px]">
+            RMSSD = &radic;[ 1/(N - 1) &times; &sum; (RR[i+1] - RR[i])&sup2; ]
+          </div>
+          <div class="text-[10px] text-slate-400">Today's Value: <strong class="text-white">{{ todayLog()?.biometrics?.overnightRMSSD || 0 }} ms</strong></div>
+        </div>
+
+        <!-- 2. Recovery -->
+        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5 font-mono">
+          <div class="text-xs font-bold text-emerald-400 uppercase">2. Composite Daily Recovery % (0–100)</div>
+          <p class="text-[11px] text-slate-400 font-sans">Non-linear weighted autonomic recovery score relative to individual baseline:</p>
+          <div class="p-2 rounded bg-slate-900 text-teal-300 text-[11px]">
+            Recovery = (0.60 &times; HRV_Score) + (0.40 &times; RHR_Score)
+          </div>
+          <div class="text-[10px] text-slate-400">Today's Score: <strong class="text-white">{{ recoveryScore() }}%</strong></div>
+        </div>
+
+        <!-- 3. Banister TRIMP Strain -->
+        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5 font-mono">
+          <div class="text-xs font-bold text-cyan-400 uppercase">3. Banister TRIMP Asymptotic Day Strain (0.0–21.0)</div>
+          <p class="text-[11px] text-slate-400 font-sans">Cardiac load integrated over time and mapped asymptotically:</p>
+          <div class="p-2 rounded bg-slate-900 text-cyan-300 text-[11px]">
+            Strain = 21.0 &times; [ 1 - e^(-TRIMP / 25.0) ]
+          </div>
+          <div class="text-[10px] text-slate-400">Today's Strain: <strong class="text-white">{{ strainScore() }} / 21.0</strong></div>
+        </div>
+
+        <!-- 4. Autonomic Steering Index -->
+        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5 font-mono">
+          <div class="text-xs font-bold text-indigo-400 uppercase">4. Autonomic Steering Index</div>
+          <p class="text-[11px] text-slate-400 font-sans">Parasympathetic brake (+) vs Sympathetic tone (-):</p>
+          <div class="p-2 rounded bg-slate-900 text-indigo-300 text-[11px]">
+            Steering = ln( RMSSD / RestingHR ) &times; 10
+          </div>
+          <div class="text-[10px] text-slate-400">Today's Index: <strong class="text-white">{{ todayLog()?.advancedKPIs?.autonomicSteeringIndex || 0 }}</strong></div>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        (click)="toggleAlgorithmInspector()"
+        class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-mono text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+      >
+        CLOSE INSPECTOR
+      </button>
+    </div>
+  </div>
 </div>

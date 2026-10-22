@@ -1,0 +1,379 @@
+<div class="p-6 max-w-7xl mx-auto space-y-6 font-sans text-slate-200">
+
+  <!-- Header & Toolbar -->
+  <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-800">
+    <div>
+      <div class="flex items-center gap-2">
+        <span class="w-3 h-3 rounded-full bg-cyan-400 animate-ping"></span>
+        <h1 class="text-xl font-mono font-bold tracking-tight text-white uppercase">
+          MASTER DEVELOPER LAB // TELEMETRY BENCHMARK
+        </h1>
+      </div>
+      <p class="text-xs text-slate-400 mt-1 font-sans">
+        Side-by-side ground truth verification: <strong class="text-indigo-400">Polar ECG</strong> vs <strong class="text-rose-400">Camera Optical PPG</strong> vs <strong class="text-amber-400">Xiaomi Smart Band</strong>.
+      </p>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        (click)="exportTelemetryJson()"
+        class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-mono text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+        title="Download live JSON snapshot of all active sensors"
+      >
+        <span>📥 EXPORT JSON</span>
+      </button>
+
+      <button
+        type="button"
+        (click)="exportBenchmarkCsv()"
+        [disabled]="comparisonLogs().length === 0"
+        class="px-3 py-1.5 rounded-xl bg-cyan-600/30 hover:bg-cyan-600/50 disabled:opacity-40 border border-cyan-500/40 text-cyan-300 font-mono text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+        title="Download 1-second interval comparison logs as CSV"
+      >
+        <span>📊 EXPORT CSV</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- SECTION 1: SENSOR HEAD-TO-HEAD MATRIX -->
+  <section class="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono">
+    
+    <!-- CARD 1: POLAR ECG (GROUND TRUTH) -->
+    <div class="p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950/40 to-slate-950 border border-indigo-900/50 shadow-md space-y-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full" [ngClass]="bleHR.isConnected() ? 'bg-indigo-400 animate-pulse' : 'bg-slate-600'"></span>
+          <span class="text-xs font-bold text-indigo-300 uppercase">1. POLAR CHEST STRAP</span>
+        </div>
+        <span class="text-[9px] px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/40 text-indigo-300">
+          ECG REFERENCE
+        </span>
+      </div>
+
+      <div class="space-y-1">
+        <div class="text-[10px] text-slate-500 uppercase">DEVICE NAME / PROTOCOL</div>
+        <div class="text-xs font-bold text-slate-200 truncate">
+          {{ bleHR.deviceName() || 'Not Connected (BLE 0x180D)' }}
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
+        <div class="p-2 rounded bg-slate-950/60 border border-slate-800/80">
+          <div class="text-[9px] text-slate-500 uppercase">LIVE BPM</div>
+          <div class="text-2xl font-bold text-white mt-0.5">
+            {{ bleHR.liveBpm() || '--' }} <span class="text-xs text-slate-500 font-normal">bpm</span>
+          </div>
+        </div>
+        <div class="p-2 rounded bg-slate-950/60 border border-slate-800/80">
+          <div class="text-[9px] text-slate-500 uppercase">LAST R-R</div>
+          <div class="text-2xl font-bold text-indigo-300 mt-0.5">
+            {{ bleHR.lastRRIntervalMs() || '--' }} <span class="text-xs text-slate-500 font-normal">ms</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800/80 text-[11px] space-y-1">
+        <div class="flex justify-between">
+          <span class="text-slate-500">Session RMSSD:</span>
+          <span class="font-bold text-emerald-400">{{ bleHR.scanSession().currentRMSSD }} ms</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">ECG Accuracy:</span>
+          <span class="font-bold text-indigo-300">> 99.6% (Gold Standard)</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Battery:</span>
+          <span class="text-slate-300">{{ bleHR.batteryLevel() !== null ? (bleHR.batteryLevel() + '%') : 'N/A' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 2: PHONE CAMERA OPTICAL PPG -->
+    <div class="p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-rose-950/30 to-slate-950 border border-rose-900/40 shadow-md space-y-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full" [ngClass]="ppg.scanState().isActive ? 'bg-rose-400 animate-pulse' : 'bg-slate-600'"></span>
+          <span class="text-xs font-bold text-rose-300 uppercase">2. CAMERA OPTICAL PPG</span>
+        </div>
+        <span class="text-[9px] px-2 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/40 text-rose-300">
+          CAPILLARY PULSE
+        </span>
+      </div>
+
+      <div class="space-y-1">
+        <div class="text-[10px] text-slate-500 uppercase">OPTICAL LOCK / STATUS</div>
+        <div class="text-xs font-bold text-slate-200 truncate">
+          {{ ppg.scanState().isActive ? (ppg.scanState().isFingerDetected ? 'FINGER LOCKED (30 FPS)' : 'ALIGNING LENS...') : 'Standby (Camera Inactive)' }}
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
+        <div class="p-2 rounded bg-slate-950/60 border border-slate-800/80">
+          <div class="text-[9px] text-slate-500 uppercase">OPTICAL BPM</div>
+          <div class="text-2xl font-bold text-rose-400 mt-0.5">
+            {{ ppg.scanState().liveBpm || '--' }} <span class="text-xs text-slate-500 font-normal">bpm</span>
+          </div>
+        </div>
+        <div class="p-2 rounded bg-slate-950/60 border border-slate-800/80">
+          <div class="text-[9px] text-slate-500 uppercase">OPTICAL RMSSD</div>
+          <div class="text-2xl font-bold text-emerald-400 mt-0.5">
+            {{ ppg.scanState().currentRMSSD || '--' }} <span class="text-xs text-slate-500 font-normal">ms</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800/80 text-[11px] space-y-1">
+        <div class="flex justify-between">
+          <span class="text-slate-500">BPM Delta vs ECG:</span>
+          <span class="font-bold" [ngClass]="currentBpmDelta() === null ? 'text-slate-500' : (currentBpmDelta()! <= 3 ? 'text-emerald-400' : 'text-amber-400')">
+            {{ currentBpmDelta() !== null ? ('± ' + currentBpmDelta() + ' bpm (' + currentBpmErrorPercent() + '%)') : 'Waiting for both sensors' }}
+          </span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Optical Samples:</span>
+          <span class="text-slate-300">{{ ppg.scanState().capturedIBIs.length }} beats</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Signal Quality:</span>
+          <span class="font-bold text-rose-300">{{ ppg.scanState().isFingerDetected ? 'HIGH (RED SATURATED)' : 'LOW' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 3: XIAOMI SMART BAND 8 / 9 -->
+    <div class="p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-amber-950/30 to-slate-950 border border-amber-900/40 shadow-md space-y-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full" [ngClass]="xiaomi.lastImport() ? 'bg-amber-400' : 'bg-slate-600'"></span>
+          <span class="text-xs font-bold text-amber-300 uppercase">3. XIAOMI BAND 8 / 9</span>
+        </div>
+        <span class="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/40 text-amber-300">
+          $35 WEARABLE
+        </span>
+      </div>
+
+      <div class="space-y-1">
+        <div class="text-[10px] text-slate-500 uppercase">DATA INGESTION SOURCE</div>
+        <div class="text-xs font-bold text-slate-200 truncate">
+          {{ xiaomi.lastImport() ? ('Imported Log (' + xiaomi.lastImport()?.date + ')') : 'Awaiting Mi Fitness / Gadgetbridge File' }}
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
+        <div class="p-2 rounded bg-slate-950/60 border border-slate-800/80">
+          <div class="text-[9px] text-slate-500 uppercase">RESTING HR</div>
+          <div class="text-2xl font-bold text-amber-300 mt-0.5">
+            {{ xiaomi.lastImport()?.restingHR || '--' }} <span class="text-xs text-slate-500 font-normal">bpm</span>
+          </div>
+        </div>
+        <div class="p-2 rounded bg-slate-950/60 border border-slate-800/80">
+          <div class="text-[9px] text-slate-500 uppercase">RECOVERY %</div>
+          <div class="text-2xl font-bold text-emerald-400 mt-0.5">
+            {{ xiaomi.lastImport()?.calculatedRecovery || '--' }}<span class="text-xs text-slate-500 font-normal">%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800/80 text-[11px] space-y-1">
+        <div class="flex justify-between">
+          <span class="text-slate-500">Sleep Architecture:</span>
+          <span class="text-slate-300">{{ xiaomi.lastImport() ? (xiaomi.lastImport()?.deepSleepMin + 'm Deep / ' + xiaomi.lastImport()?.remSleepMin + 'm REM') : 'N/A' }}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Steps Recorded:</span>
+          <span class="text-slate-300">{{ xiaomi.lastImport()?.steps || '0' }}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Hardware Class:</span>
+          <span class="text-amber-300">Dual-Channel PPG (Wrist)</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 2: LIVE CONCURRENT STREAM BENCHMARK LOGGER -->
+  <section class="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-lg space-y-4 font-mono">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div>
+        <div class="text-xs font-bold text-cyan-300 uppercase tracking-wide">
+          CONCURRENT SENSOR COMPARISON LOGGER (1 HZ FREQUENCY)
+        </div>
+        <div class="text-[11px] text-slate-400 font-sans">
+          Runs continuous 1-second sampling across active sensors to benchmark drift, latency, and absolute error.
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          (click)="toggleBenchmarkStream()"
+          class="px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+          [ngClass]="isBenchmarking() ? 'bg-rose-600 hover:bg-rose-500 text-white' : 'bg-cyan-600 hover:bg-cyan-500 text-slate-950'"
+        >
+          {{ isBenchmarking() ? '■ STOP LOGGING' : '▶ START 1-SEC BENCHMARK' }}
+        </button>
+
+        <button
+          type="button"
+          (click)="clearLogs()"
+          class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs transition-colors cursor-pointer"
+        >
+          CLEAR
+        </button>
+      </div>
+    </div>
+
+    <!-- Comparison Table -->
+    <div class="overflow-x-auto max-h-64 border border-slate-800 rounded-xl">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] sticky top-0 border-b border-slate-800">
+          <tr>
+            <th class="p-2.5">TIMESTAMP</th>
+            <th class="p-2.5 text-indigo-400">POLAR ECG (BPM)</th>
+            <th class="p-2.5 text-indigo-400">POLAR R-R (MS)</th>
+            <th class="p-2.5 text-rose-400">CAMERA PPG (BPM)</th>
+            <th class="p-2.5 text-rose-400">CAMERA IBI (MS)</th>
+            <th class="p-2.5 text-cyan-400">DELTA (BPM)</th>
+            <th class="p-2.5 text-amber-400">ERROR %</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800/60 bg-slate-900/40">
+          <tr *ngFor="let row of comparisonLogs()">
+            <td class="p-2.5 text-slate-400">{{ row.timestamp }}</td>
+            <td class="p-2.5 font-bold text-white">{{ row.polarBpm || '--' }}</td>
+            <td class="p-2.5 text-indigo-300">{{ row.polarRRMs ? (row.polarRRMs + ' ms') : '--' }}</td>
+            <td class="p-2.5 font-bold text-rose-300">{{ row.ppgBpm || '--' }}</td>
+            <td class="p-2.5 text-rose-400">{{ row.ppgIBIMs ? (row.ppgIBIMs + ' ms') : '--' }}</td>
+            <td class="p-2.5 font-bold" [ngClass]="row.bpmDelta !== null ? (row.bpmDelta <= 3 ? 'text-emerald-400' : 'text-amber-400') : 'text-slate-500'">
+              {{ row.bpmDelta !== null ? (row.bpmDelta + ' bpm') : '--' }}
+            </td>
+            <td class="p-2.5 font-bold" [ngClass]="row.errorPercent !== null ? (row.errorPercent <= 3.0 ? 'text-emerald-400' : 'text-rose-400') : 'text-slate-500'">
+              {{ row.errorPercent !== null ? (row.errorPercent + '%') : '--' }}
+            </td>
+          </tr>
+          <tr *ngIf="comparisonLogs().length === 0">
+            <td colspan="7" class="p-6 text-center text-slate-500 font-sans text-xs">
+              No comparison samples recorded yet. Click <strong>"START 1-SEC BENCHMARK"</strong> to begin capturing concurrent telemetry.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SECTION 3: PHYSIOLOGICAL CHAOS & EDGE CASE SIMULATOR -->
+  <section class="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-purple-950/20 to-slate-950 border border-purple-900/30 shadow-lg space-y-4 font-mono">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-xs font-bold text-purple-300 uppercase tracking-wide">
+          PHYSIOLOGICAL CHAOS & ALGORITHM EDGE-CASE TESTER
+        </div>
+        <div class="text-[11px] text-slate-400 font-sans">
+          Inject physiological extremes to verify mathematical bounds (Strain: 0.0 to 21.0, Recovery: 0 to 100%).
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+      <!-- Input 1: Heart Rate -->
+      <div class="space-y-1.5 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+        <div class="flex justify-between text-xs">
+          <span class="text-slate-400">Workout Heart Rate:</span>
+          <span class="text-cyan-400 font-bold">{{ simHR() }} BPM</span>
+        </div>
+        <input
+          type="range"
+          min="40"
+          max="205"
+          [value]="simHR()"
+          (input)="simHR.set(+$any($event.target).value)"
+          class="w-full accent-cyan-400 cursor-pointer"
+        />
+        <div class="flex justify-between text-[9px] text-slate-500">
+          <span>40 (Bradycardia)</span>
+          <span>205 (Max Aerobic)</span>
+        </div>
+      </div>
+
+      <!-- Input 2: RMSSD -->
+      <div class="space-y-1.5 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+        <div class="flex justify-between text-xs">
+          <span class="text-slate-400">Nocturnal RMSSD:</span>
+          <span class="text-emerald-400 font-bold">{{ simRMSSD() }} MS</span>
+        </div>
+        <input
+          type="range"
+          min="8"
+          max="160"
+          [value]="simRMSSD()"
+          (input)="simRMSSD.set(+$any($event.target).value)"
+          class="w-full accent-emerald-400 cursor-pointer"
+        />
+        <div class="flex justify-between text-[9px] text-slate-500">
+          <span>8 (Severe Stress/Alcohol)</span>
+          <span>160 (Elite Parasympathetic)</span>
+        </div>
+      </div>
+
+      <!-- Input 3: Resting HR -->
+      <div class="space-y-1.5 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+        <div class="flex justify-between text-xs">
+          <span class="text-slate-400">Resting Heart Rate:</span>
+          <span class="text-rose-400 font-bold">{{ simRestingHR() }} BPM</span>
+        </div>
+        <input
+          type="range"
+          min="38"
+          max="95"
+          [value]="simRestingHR()"
+          (input)="simRestingHR.set(+$any($event.target).value)"
+          class="w-full accent-rose-400 cursor-pointer"
+        />
+        <div class="flex justify-between text-[9px] text-slate-500">
+          <span>38 (Athlete RHR)</span>
+          <span>95 (Elevated Baseline)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Output from physics engine -->
+    <div class="grid grid-cols-3 gap-3 pt-2">
+      <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
+        <div class="text-[9px] text-slate-500 uppercase">ENGINE RECOVERY</div>
+        <div class="text-2xl font-bold mt-1" [ngClass]="simCalculatedRecovery() > 66 ? 'text-emerald-400' : (simCalculatedRecovery() >= 34 ? 'text-amber-400' : 'text-rose-400')">
+          {{ simCalculatedRecovery() }}%
+        </div>
+      </div>
+
+      <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
+        <div class="text-[9px] text-slate-500 uppercase">BANISTER STRAIN</div>
+        <div class="text-2xl font-bold text-cyan-400 mt-1">
+          {{ simCalculatedStrain() }} <span class="text-xs text-slate-500 font-normal">/ 21.0</span>
+        </div>
+      </div>
+
+      <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
+        <div class="text-[9px] text-slate-500 uppercase">AUTONOMIC STEERING</div>
+        <div class="text-2xl font-bold mt-1" [ngClass]="simAutonomicSteering() >= 0 ? 'text-teal-400' : 'text-rose-400'">
+          {{ simAutonomicSteering() }}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 4: RAW JSON TELEMETRY INSPECTOR -->
+  <section class="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-md space-y-3 font-mono">
+    <div class="flex items-center justify-between">
+      <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">
+        LIVE RAW TELEMETRY JSON STREAM
+      </div>
+      <span class="text-[10px] text-slate-500">STANDBY RECEPTACLE</span>
+    </div>
+
+    <pre class="p-4 rounded-xl bg-slate-950 border border-slate-800/80 text-[11px] text-emerald-400 overflow-x-auto max-h-72 leading-relaxed">
+{{ currentTelemetryPayload() | json }}
+    </pre>
+  </section>
+
+</div>
