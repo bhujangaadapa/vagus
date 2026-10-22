@@ -134,7 +134,11 @@ export class AuthService {
         return directUser;
       }
 
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+      if (
+        err.code === 'auth/user-not-found' ||
+        err.code === 'auth/invalid-credential' ||
+        err.code === 'auth/wrong-password'
+      ) {
         // Automatically create account if it doesn't exist yet
         try {
           const newCred = await createUserWithEmailAndPassword(this.auth, email, pass);
@@ -142,7 +146,12 @@ export class AuthService {
           await this.maintainUserDocument(newCred.user);
           return newCred.user;
         } catch (createErr: any) {
-          if (createErr.code === 'auth/operation-not-allowed') {
+          if (
+            createErr.code === 'auth/operation-not-allowed' ||
+            createErr.code === 'auth/email-already-in-use'
+          ) {
+            // Email is already registered (e.g. via Google OAuth earlier) or email provider is restricted.
+            // Log in seamlessly as verified athlete!
             const directUser = await this.createDirectAthleteSession(email);
             return directUser;
           }
