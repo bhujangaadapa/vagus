@@ -348,6 +348,20 @@ export class PedometerService {
   }
 
   /**
+   * Directly set or synchronize step count (e.g. from StepUp, Apple Health, or Google Fit)
+   */
+  public setManualStepCount(steps: number, userId?: string, dateStr?: string): void {
+    const targetSteps = Math.max(0, Math.round(steps));
+    const targetUid = userId || this.currentUserId;
+    const targetDate = dateStr || this.currentDateStr;
+
+    this.currentSteps.set(targetSteps);
+    this.persistStepCount(targetSteps);
+    this.dataBridge.updateLiveSteps(targetUid, targetDate, targetSteps);
+    this.statusMessage.set(`Synced: ${targetSteps.toLocaleString()} steps logged for today.`);
+  }
+
+  /**
    * Reset step counter to zero and clear persistent cache
    */
   public resetSteps(): void {

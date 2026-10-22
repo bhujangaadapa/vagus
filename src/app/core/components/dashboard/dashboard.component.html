@@ -790,16 +790,25 @@
           class="flex-1 py-2 px-3 rounded-xl font-mono text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
           [ngClass]="pedometer.isTracking() ? 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200' : 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30'"
         >
-          <span>{{ pedometer.isTracking() ? '● AUTO-SYNC ACTIVE (TAP TO PAUSE)' : '▶ RESUME AUTO-SYNC' }}</span>
+          <span>{{ pedometer.isTracking() ? '● AUTO-SYNC ACTIVE' : '▶ RESUME AUTO-SYNC' }}</span>
+        </button>
+
+        <button
+          type="button"
+          (click)="openStepSyncModal()"
+          class="py-2 px-3 rounded-xl bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/40 text-cyan-200 font-mono text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+          title="Sync step count from StepUp, Apple Health, or Google Fit"
+        >
+          <span>🔄 SYNC STEPS</span>
         </button>
 
         <button
           type="button"
           (click)="simulateTestSteps()"
-          class="py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 font-mono text-[11px] text-slate-300 transition-colors"
+          class="py-2 px-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 font-mono text-[11px] text-slate-300 transition-colors"
           title="Simulate 25 walking strides for test verification"
         >
-          +25 TEST
+          +25
         </button>
       </div>
 
@@ -1268,6 +1277,99 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL 4: STEP SYNC MODAL (SYNC FROM STEPUP / APPLE HEALTH / GOOGLE FIT) -->
+  <div
+    *ngIf="showStepSyncModal()"
+    class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+  >
+    <div class="max-w-sm w-full p-6 rounded-3xl bg-slate-900 border border-emerald-500/40 shadow-2xl flex flex-col space-y-4 font-mono text-xs relative">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+          <span class="text-sm font-bold text-white uppercase">SYNC DAILY STEPS</span>
+        </div>
+        <button
+          type="button"
+          (click)="closeStepSyncModal()"
+          class="text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 cursor-pointer"
+        >
+          ✕
+        </button>
+      </div>
+
+      <p class="text-[11px] text-slate-400 font-sans leading-relaxed">
+        Sync your steps from <strong class="text-slate-200">StepUp</strong>, <strong class="text-slate-200">Apple Health</strong>, or <strong class="text-slate-200">Google Fit</strong>. This updates your live distance, active burn, and daily strain immediately:
+      </p>
+
+      <div class="space-y-3 pt-1">
+        <div class="space-y-1.5">
+          <label class="text-[10px] uppercase text-slate-400 font-bold">Today's Total Footsteps</label>
+          <input
+            type="number"
+            min="0"
+            max="100000"
+            step="100"
+            [value]="manualStepsInput()"
+            (input)="manualStepsInput.set(+$any($event.target).value)"
+            class="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-2xl font-bold text-emerald-400 font-mono text-center focus:border-emerald-400 focus:outline-none"
+          />
+        </div>
+
+        <!-- Quick Add Buttons -->
+        <div class="space-y-1">
+          <div class="text-[9px] uppercase text-slate-500">Quick Adjustments</div>
+          <div class="grid grid-cols-4 gap-1.5 font-mono text-[10px]">
+            <button
+              type="button"
+              (click)="quickAddSteps(500)"
+              class="py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700/80 transition-colors"
+            >
+              +500
+            </button>
+            <button
+              type="button"
+              (click)="quickAddSteps(1000)"
+              class="py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700/80 transition-colors"
+            >
+              +1,000
+            </button>
+            <button
+              type="button"
+              (click)="quickAddSteps(2500)"
+              class="py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700/80 transition-colors"
+            >
+              +2,500
+            </button>
+            <button
+              type="button"
+              (click)="quickAddSteps(5000)"
+              class="py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700/80 transition-colors"
+            >
+              +5,000
+            </button>
+          </div>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button
+            type="button"
+            (click)="confirmStepSync()"
+            class="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase tracking-wider text-xs transition-all shadow-md cursor-pointer"
+          >
+            CONFIRM & SYNC
+          </button>
+          <button
+            type="button"
+            (click)="closeStepSyncModal()"
+            class="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold uppercase tracking-wider text-xs transition-colors cursor-pointer"
+          >
+            CANCEL
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>

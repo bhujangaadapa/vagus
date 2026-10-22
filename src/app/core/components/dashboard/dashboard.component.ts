@@ -393,4 +393,27 @@ export class DashboardComponent implements OnInit {
       this.isProfileSaving.set(false);
     }
   }
+
+  // Step Sync from StepUp / Health Modal
+  public readonly showStepSyncModal = signal<boolean>(false);
+  public readonly manualStepsInput = signal<number>(0);
+
+  public openStepSyncModal(): void {
+    this.manualStepsInput.set(this.liveSteps());
+    this.showStepSyncModal.set(true);
+  }
+
+  public closeStepSyncModal(): void {
+    this.showStepSyncModal.set(false);
+  }
+
+  public confirmStepSync(): void {
+    const steps = Math.max(0, Math.round(this.manualStepsInput()));
+    this.pedometer.setManualStepCount(steps, this.activeUserId(), this.todayLog()?.date);
+    this.closeStepSyncModal();
+  }
+
+  public quickAddSteps(amount: number): void {
+    this.manualStepsInput.set(Math.max(0, this.manualStepsInput() + amount));
+  }
 }
