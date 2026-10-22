@@ -5,7 +5,8 @@ const config: CapacitorConfig = {
   appName: 'Vagus',
   webDir: 'dist/antigravity/browser',
   server: {
-    androidScheme: 'https',
+    url: 'https://vagus-nine.vercel.app',
+    cleartext: true,
   },
 };
 

@@ -8,6 +8,8 @@ import {
   signOut,
   authState,
   User,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
 } from '@angular/fire/auth';
 import { Firestore, doc, getDoc, setDoc } from '@angular/fire/firestore';
 import { UserProfileDocument, UserPhysiologyBaseline, UserDemographics } from '../models/biometrics.interface';
@@ -75,8 +77,12 @@ export class AuthService {
       const error = err as { code?: string; message?: string };
       console.warn('[AuthService] Google Sign-In error:', error);
 
-      if (error.code === 'auth/popup-blocked') {
-        // Mobile browsers often block popups; fallback to direct redirect
+      if (
+        error.code === 'auth/popup-blocked' ||
+        error.code === 'auth/operation-not-supported-in-this-environment' ||
+        error.code === 'auth/unauthorized-domain'
+      ) {
+        // WebView / Mobile environment: fallback to direct OAuth redirect
         try {
           await signInWithRedirect(this.auth, provider);
           return null;
@@ -90,6 +96,38 @@ export class AuthService {
         // User clicked twice; ignore
       } else {
         this.authError.set(error.message || 'Google authentication error.');
+      }
+      return null;
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
+  /**
+   * Universal Email & Password Authentication for Mobile Native App & Web
+   */
+  public async loginWithEmail(email: string, pass: string): Promise<User | null> {
+    this.isLoading.set(true);
+    this.authError.set(null);
+
+    try {
+      const cred = await signInWithEmailAndPassword(this.auth, email, pass);
+      this.currentUser.set(cred.user);
+      await this.maintainUserDocument(cred.user);
+      return cred.user;
+    } catch (err: any) {
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+        // Automatically create account if it doesn't exist yet
+        try {
+          const newCred = await createUserWithEmailAndPassword(this.auth, email, pass);
+          this.currentUser.set(newCred.user);
+          await this.maintainUserDocument(newCred.user);
+          return newCred.user;
+        } catch (createErr: any) {
+          this.authError.set(createErr.message || 'Login error.');
+        }
+      } else {
+        this.authError.set(err.message || 'Authentication error.');
       }
       return null;
     } finally {

@@ -87,20 +87,31 @@
           <div class="text-[10px] font-mono text-slate-500">Sign in to sync your cloud physiology document</div>
         </div>
 
-        <button
-          type="button"
-          (click)="loginGoogle()"
-          [disabled]="authService.isLoading()"
-          class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white text-slate-900 hover:bg-slate-100 font-mono text-xs font-semibold shadow transition-all disabled:opacity-50 cursor-pointer"
-        >
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24">
-            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/>
-            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24Z"/>
-            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15Z"/>
-            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"/>
-          </svg>
-          <span>{{ authService.isLoading() ? 'SIGNING IN...' : 'GOOGLE SIGN IN' }}</span>
-        </button>
+        <div class="flex items-center gap-1.5">
+          <button
+            type="button"
+            (click)="loginGoogle()"
+            [disabled]="authService.isLoading()"
+            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white text-slate-900 hover:bg-slate-100 font-mono text-xs font-semibold shadow transition-all disabled:opacity-50 cursor-pointer"
+          >
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24Z"/>
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15Z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"/>
+            </svg>
+            <span>{{ authService.isLoading() ? '...' : 'GOOGLE' }}</span>
+          </button>
+
+          <button
+            type="button"
+            (click)="showEmailLoginModal.set(true)"
+            class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-xs font-semibold transition-colors cursor-pointer"
+            title="Sign in with Email & Password (Works anywhere)"
+          >
+            ✉️ EMAIL
+          </button>
+        </div>
       </div>
       <div *ngIf="authService.authError()" class="mt-2 p-2 rounded bg-amber-950/40 border border-amber-800/40 flex items-center justify-between text-[10px] font-mono text-amber-300">
         <span class="truncate mr-2">{{ authService.authError() }}</span>
@@ -1370,6 +1381,83 @@
           </button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL 5: EMAIL & PASSWORD ATHLETE AUTH MODAL -->
+  <div
+    *ngIf="showEmailLoginModal()"
+    class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+  >
+    <div class="max-w-sm w-full p-6 rounded-3xl bg-slate-900 border border-slate-700 shadow-2xl flex flex-col space-y-4 font-mono text-xs relative">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+          <span class="text-sm font-bold text-white uppercase">ATHLETE EMAIL SIGN IN</span>
+        </div>
+        <button
+          type="button"
+          (click)="showEmailLoginModal.set(false)"
+          class="text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 cursor-pointer"
+        >
+          ✕
+        </button>
+      </div>
+
+      <p class="text-[11px] text-slate-400 font-sans leading-relaxed">
+        Sign in or create your cloud athlete account with email. Works directly on Android, iOS, and Web without browser popup restrictions:
+      </p>
+
+      <div *ngIf="authService.authError()" class="p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/50 text-[10px] text-rose-300">
+        {{ authService.authError() }}
+      </div>
+
+      <form (submit)="$event.preventDefault(); submitEmailLogin()" class="space-y-3 pt-1">
+        <div class="space-y-1">
+          <label class="text-[10px] uppercase text-slate-400 font-bold">Email Address</label>
+          <input
+            type="email"
+            required
+            placeholder="athlete@vagus.health"
+            [value]="emailInput()"
+            (input)="emailInput.set($any($event.target).value)"
+            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:border-cyan-400 focus:outline-none"
+          />
+        </div>
+
+        <div class="space-y-1">
+          <label class="text-[10px] uppercase text-slate-400 font-bold">Password</label>
+          <input
+            type="password"
+            required
+            placeholder="••••••••"
+            [value]="passwordInput()"
+            (input)="passwordInput.set($any($event.target).value)"
+            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:border-cyan-400 focus:outline-none"
+          />
+          <div class="text-[9px] text-slate-500 font-sans">
+            If you don't have an account, entering your password will automatically register you!
+          </div>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button
+            type="button"
+            (click)="submitEmailLogin()"
+            [disabled]="authService.isLoading()"
+            class="flex-1 py-2.5 px-4 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold uppercase tracking-wider text-xs transition-all shadow-md cursor-pointer disabled:opacity-50"
+          >
+            {{ authService.isLoading() ? 'CONNECTING...' : 'CONTINUE' }}
+          </button>
+          <button
+            type="button"
+            (click)="showEmailLoginModal.set(false)"
+            class="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold uppercase tracking-wider text-xs transition-colors cursor-pointer"
+          >
+            CANCEL
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 </div>

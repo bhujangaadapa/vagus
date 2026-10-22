@@ -416,4 +416,19 @@ export class DashboardComponent implements OnInit {
   public quickAddSteps(amount: number): void {
     this.manualStepsInput.set(Math.max(0, this.manualStepsInput() + amount));
   }
+
+  // Email Login Modal
+  public readonly showEmailLoginModal = signal<boolean>(false);
+  public readonly emailInput = signal<string>('');
+  public readonly passwordInput = signal<string>('');
+
+  public async submitEmailLogin(): Promise<void> {
+    if (!this.emailInput() || !this.passwordInput()) return;
+    const user = await this.authService.loginWithEmail(this.emailInput(), this.passwordInput());
+    if (user) {
+      this.showEmailLoginModal.set(false);
+      this.emailInput.set('');
+      this.passwordInput.set('');
+    }
+  }
 }
