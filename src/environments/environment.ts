@@ -1,11 +1,11 @@
 export const environment = {
   production: false,
   firebase: {
-    apiKey: 'AIzaSyC4ShZ4TmH-gAhcJgCpamfoLyMqfFoVl2U',
-    authDomain: 'all-in-aces-poker.firebaseapp.com',
-    projectId: 'all-in-aces-poker',
-    storageBucket: 'all-in-aces-poker.firebasestorage.app',
-    messagingSenderId: '493331394929',
-    appId: '1:493331394929:web:cf08df722d9ec1d83fc6d0',
+    apiKey: 'AIzaSyC5g7dq6XSBy1ZqpcQ0xUsOzqYrXb64CcA',
+    authDomain: 'vagus-health-51057.firebaseapp.com',
+    projectId: 'vagus-health-51057',
+    storageBucket: 'vagus-health-51057.firebasestorage.app',
+    messagingSenderId: '256801423578',
+    appId: '1:256801423578:web:7b1ae206c30f728457e5e3',
   },
 };
