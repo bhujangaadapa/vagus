@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Capacitor } from '@capacitor/core';
 import { AuthService } from '../../services/auth.service';
 import { DataBridgeService } from '../../services/data-bridge.service';
 import { PhysicsEngineService } from '../../services/physics-engine.service';
@@ -18,6 +19,7 @@ import { DailyBiometricLog, JournalHabits } from '../../models/biometrics.interf
 })
 export class DashboardComponent implements OnInit {
   public readonly Math = Math;
+  public readonly isNativeApp = Capacitor.isNativePlatform();
   public readonly authService = inject(AuthService);
   private readonly dataBridge = inject(DataBridgeService);
   private readonly physicsEngine = inject(PhysicsEngineService);
@@ -251,6 +253,12 @@ export class DashboardComponent implements OnInit {
   }
 
   public async loginGoogle(): Promise<void> {
+    if (this.isNativeApp) {
+      // In native Android WebView, Google blocks popup windows for OAuth security.
+      // Open the athlete sign-in modal with email/password
+      this.showEmailLoginModal.set(true);
+      return;
+    }
     await this.authService.loginWithGoogle();
   }
 

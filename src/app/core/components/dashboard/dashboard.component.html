@@ -1512,6 +1512,10 @@
         </button>
       </div>
 
+      <div *ngIf="isNativeApp" class="p-2.5 rounded-2xl bg-cyan-950/40 border border-cyan-800/50 text-[10px] text-cyan-200 font-sans leading-relaxed">
+        💡 <strong>Google OAuth in Native Apps</strong>: Google security blocks popups inside Android WebViews. Sign in with your email below, or use <a href="https://vagus-nine.vercel.app" target="_blank" class="text-cyan-400 underline font-semibold">vagus-nine.vercel.app</a> in Chrome.
+      </div>
+
       <p class="text-[11px] text-zinc-400 font-sans leading-relaxed">
         Sign in with email and password to sync your biometrics across your phone and web:
       </p>
