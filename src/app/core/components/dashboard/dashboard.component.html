@@ -1455,6 +1455,24 @@
               </div>
             </div>
           </div>
+
+          <!-- Quick Launch Workout with Digifit Telemetry -->
+          <div class="p-4 rounded-2xl bg-cyan-950/20 border border-cyan-900/40 space-y-2 font-mono">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-cyan-300 font-bold uppercase tracking-wider">LIVE WORKOUT & DIGIFIT TELEMETRY</span>
+              <span class="text-[9px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 font-bold">Z1–Z5 ZONES</span>
+            </div>
+            <p class="text-[11px] text-zinc-400 font-sans">
+              Stream live heart rate zones, multi-colored ribbon plot, and 60-second Vagal Recovery during volleyball, walking, or lifting:
+            </p>
+            <button
+              type="button"
+              (click)="setPillar('strain'); toggleWorkoutTracker()"
+              class="w-full py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-[#00F5A0] hover:brightness-110 text-slate-950 font-bold uppercase tracking-wider text-xs transition-all shadow-md active:scale-[0.99] cursor-pointer"
+            >
+              🚀 LAUNCH DIGIFIT WORKOUT HUD IN STRAIN &rarr;
+            </button>
+          </div>
         </div>
       </section>
 

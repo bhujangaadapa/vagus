@@ -493,8 +493,6 @@ export class BleHeartRateService {
    * Start Live Workout Strain Tracking (Digifit-style Zones + Telemetry + Sport Activity)
    */
   public startWorkout(sport?: SportActivityDef): void {
-    if (!this.isConnected()) return;
-
     if (this.workoutTimerInterval) {
       clearInterval(this.workoutTimerInterval);
       this.workoutTimerInterval = null;

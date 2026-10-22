@@ -351,10 +351,13 @@ export class DashboardComponent implements OnInit {
     this.bleHR.stopReadinessScan(save);
   }
 
-  public toggleWorkoutTracker(): void {
+  public async toggleWorkoutTracker(): Promise<void> {
     if (this.bleHR.workoutSession().isActive) {
       this.bleHR.finishWorkoutAndStartRecoveryTest();
     } else {
+      if (!this.bleHR.isConnected()) {
+        await this.bleHR.connect();
+      }
       this.bleHR.startWorkout();
     }
   }
