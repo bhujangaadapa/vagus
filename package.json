@@ -28,6 +28,8 @@
     "@angular/build": "^22.2.0",
     "@angular/cli": "^22.2.0",
     "@angular/compiler-cli": "^22.2.0",
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
     "@tailwindcss/postcss": "^4.3.3",
     "autoprefixer": "^10.6.1",
     "postcss": "^8.5.31",
