@@ -54,6 +54,7 @@ export class DashboardComponent implements OnInit {
 
   public readonly recoveryColor = computed(() => {
     const score = this.recoveryScore();
+    if (score === 0) return { text: 'text-slate-400', stroke: '#475569', bg: 'bg-slate-800/20', border: 'border-slate-700/30' };
     if (score > 66) return { text: 'text-emerald-400', stroke: '#34d399', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' };
     if (score >= 34) return { text: 'text-amber-400', stroke: '#fbbf24', bg: 'bg-amber-500/10', border: 'border-amber-500/30' };
     return { text: 'text-rose-500', stroke: '#f43f5e', bg: 'bg-rose-500/10', border: 'border-rose-500/30' };
@@ -61,6 +62,7 @@ export class DashboardComponent implements OnInit {
 
   public readonly recoveryStatusText = computed(() => {
     const score = this.recoveryScore();
+    if (score === 0) return 'AWAITING TELEMETRY';
     if (score > 66) return 'PRIME RECOVERY';
     if (score >= 34) return 'STEADY ADAPTATION';
     return 'REST & RECHARGE';
@@ -101,7 +103,7 @@ export class DashboardComponent implements OnInit {
   public ngOnInit(): void {
     this.dataBridge.logs$.subscribe((logs) => {
       this.historyLogs.set(logs);
-      if (logs.length > 0 && !this.todayLog()) {
+      if (logs.length > 0) {
         this.todayLog.set(logs[logs.length - 1]);
       }
     });
@@ -111,15 +113,18 @@ export class DashboardComponent implements OnInit {
         this.todayLog.set(log);
       }
     });
+  }
 
-    this.seedInitialData();
+  public async resetAllData(): Promise<void> {
+    const uid = this.activeUserId();
+    this.pedometer.resetSteps();
+    const clean = await this.dataBridge.resetAllData(uid);
+    this.todayLog.set(clean);
+    this.historyLogs.set([clean]);
   }
 
   public async loginGoogle(): Promise<void> {
-    const user = await this.authService.loginWithGoogle();
-    if (user) {
-      await this.seedInitialData();
-    }
+    await this.authService.loginWithGoogle();
   }
 
   public async loginDemo(): Promise<void> {

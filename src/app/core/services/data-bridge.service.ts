@@ -1,5 +1,16 @@
 import { Injectable, inject } from '@angular/core';
-import { Firestore, doc, docData, setDoc, collection, collectionData, query, orderBy } from '@angular/fire/firestore';
+import {
+  Firestore,
+  doc,
+  docData,
+  setDoc,
+  collection,
+  collectionData,
+  query,
+  orderBy,
+  getDocs,
+  deleteDoc,
+} from '@angular/fire/firestore';
 import { Observable, BehaviorSubject, of, from } from 'rxjs';
 import { map, catchError, switchMap, tap } from 'rxjs/operators';
 import { Capacitor } from '@capacitor/core';
@@ -252,6 +263,79 @@ export class DataBridgeService {
     }
 
     return baseLog;
+  }
+
+  /**
+   * Reset / Purge all historical telemetry data and start with a clean zero-state
+   */
+  public async resetAllData(userId: string): Promise<DailyBiometricLog> {
+    const todayStr = this.getFormattedDate(new Date());
+
+    // Clean zero-state day
+    const cleanDay: DailyBiometricLog = {
+      date: todayStr,
+      biometrics: {
+        overnightRMSSD: 0,
+        restingHR: 0,
+        sleepMinutes: 0,
+        deepSleepMinutes: 0,
+        remSleepMinutes: 0,
+        avgSleepHR: 0,
+        steps: 0,
+      },
+      journalHabits: {
+        drankAlcohol: false,
+        lateMeal: false,
+        viewedSunlight: false,
+        caffeineAfter2PM: false,
+      },
+      scores: {
+        calculatedRecovery: 0,
+        calculatedStrain: 0.0,
+      },
+      advancedKPIs: {
+        cumulativeFatigueDrag: 0.0,
+        autonomicSteeringIndex: 0.0,
+        sleepEfficiencyCoefficient: 0.0,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Reset local reactive state
+    this.logsSubject.next([cleanDay]);
+    this.todayLogSubject.next(cleanDay);
+
+    // Clear client-side local cache
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('vagus_step_counter_state');
+    }
+
+    // Purge Firestore daily_logs subcollection
+    try {
+      const logsRef = collection(this.firestore, `users/${userId}/daily_logs`);
+      const snapshot = await getDocs(logsRef);
+      const deletions = snapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
+      await Promise.all(deletions);
+
+      // Save the single clean zero-state day
+      const todayRef = doc(this.firestore, `users/${userId}/daily_logs/${todayStr}`);
+      await setDoc(todayRef, cleanDay);
+
+      // Update parent user document
+      const userRef = doc(this.firestore, `users/${userId}`);
+      await setDoc(
+        userRef,
+        {
+          lastResetAt: new Date().toISOString(),
+          baseline: { ...this.userBaseline },
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.warn('[DataBridge] Firestore purge error:', err);
+    }
+
+    return cleanDay;
   }
 
   /**

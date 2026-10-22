@@ -342,6 +342,18 @@ export class PedometerService {
     } catch {}
   }
 
+  /**
+   * Reset step counter to zero and clear persistent cache
+   */
+  public resetSteps(): void {
+    this.currentSteps.set(0);
+    this.activeCadence.set(0);
+    this.recentStepTimes = [];
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(this.storageKey);
+    }
+  }
+
   public simulateStride(count: number = 10): void {
     for (let i = 0; i < count; i++) {
       this.onStepDetected(1, false);
