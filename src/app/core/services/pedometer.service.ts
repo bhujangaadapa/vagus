@@ -69,7 +69,7 @@ export class PedometerService {
       window.addEventListener('androidHardwareStep', (event: any) => {
         if (event && event.detail && typeof event.detail.steps === 'number') {
           const steps = event.detail.steps;
-          if (steps >= 0) {
+          if (steps > 0 && steps >= this.currentSteps()) {
             this.currentSteps.set(steps);
             this.persistStepCount(steps);
             this.dataBridge.updateLiveSteps(this.currentUserId, this.currentDateStr, steps);
@@ -84,6 +84,26 @@ export class PedometerService {
 
     // Auto-start tracking on initialization like StepUp
     this.autoStartTracking();
+
+    // Check hardware bridge with short delays in case WebView interface attaches right after bundle evaluation
+    if (typeof window !== 'undefined') {
+      [300, 1000, 2500].forEach((delay) => {
+        setTimeout(() => {
+          const b = (window as any).AndroidHardwarePedometer;
+          if (b && typeof b.getLiveSteps === 'function') {
+            const steps = b.getLiveSteps();
+            if (steps > 0 && steps >= this.currentSteps()) {
+              this.currentSteps.set(steps);
+              this.persistStepCount(steps);
+              this.dataBridge.updateLiveSteps(this.currentUserId, this.currentDateStr, steps);
+              this.activeEngine.set('ANDROID_HARDWARE_PEDOMETER');
+              this.isTracking.set(true);
+              this.permissionState.set('GRANTED');
+            }
+          }
+        }, delay);
+      });
+    }
   }
 
   /**
@@ -118,16 +138,16 @@ export class PedometerService {
     const bridge = typeof window !== 'undefined' ? (window as any).AndroidHardwarePedometer : null;
     if (bridge && typeof bridge.getLiveSteps === 'function') {
       const steps = bridge.getLiveSteps();
-      if (steps >= 0) {
+      if (steps > 0 && steps >= this.currentSteps()) {
         this.currentSteps.set(steps);
         this.persistStepCount(steps);
         this.dataBridge.updateLiveSteps(this.currentUserId, this.currentDateStr, steps);
-        this.activeEngine.set('ANDROID_HARDWARE_PEDOMETER');
-        this.isTracking.set(true);
-        this.permissionState.set('GRANTED');
-        this.statusMessage.set('Hardware Step Sensor Active');
-        return true;
       }
+      this.activeEngine.set('ANDROID_HARDWARE_PEDOMETER');
+      this.isTracking.set(true);
+      this.permissionState.set('GRANTED');
+      this.statusMessage.set('Hardware Step Sensor Active');
+      return true;
     }
 
     // 1. Native iOS / Android Capacitor Layer
@@ -363,7 +383,18 @@ export class PedometerService {
   }
 
   private async onAppForegrounded(): Promise<void> {
-    // Re-check native measurement on app wake
+    // 0. Re-check Android Hardware Pedometer
+    const bridge = typeof window !== 'undefined' ? (window as any).AndroidHardwarePedometer : null;
+    if (bridge && typeof bridge.getLiveSteps === 'function') {
+      const steps = bridge.getLiveSteps();
+      if (steps > 0 && steps >= this.currentSteps()) {
+        this.currentSteps.set(steps);
+        this.persistStepCount(steps);
+        this.dataBridge.updateLiveSteps(this.currentUserId, this.currentDateStr, steps);
+      }
+    }
+
+    // 1. Re-check native measurement on app wake
     if (Capacitor.isNativePlatform()) {
       try {
         const startOfDay = new Date();

@@ -22,27 +22,24 @@ import java.util.Locale;
 public class MainActivity extends BridgeActivity implements SensorEventListener {
 
     private static final int PERMISSION_REQ_CODE = 2001;
-    private static final String PREFS_NAME = "vagus_hardware_pedometer";
+    private static final String PREFS_NAME = "vagus_hardware_pedometer_v2";
     private static final String KEY_DATE = "step_date";
+    private static final String KEY_STORED_STEPS = "stored_today_steps";
     private static final String KEY_BASELINE = "step_baseline";
-    private static final String KEY_LAST_STEPS = "last_today_steps";
 
     private SensorManager sensorManager;
     private Sensor stepCounterSensor;
-    private int currentDailySteps = 0;
     private int lastRawHardwareSteps = 0;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Initialize Android Hardware Step Counter
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         if (sensorManager != null) {
             stepCounterSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
         }
 
-        // Request Activity Recognition Permission on Android 10+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[]{Manifest.permission.ACTIVITY_RECOGNITION}, PERMISSION_REQ_CODE);
@@ -54,7 +51,6 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     public void onResume() {
         super.onResume();
 
-        // Register Hardware Step Counter Listener
         if (sensorManager != null && stepCounterSensor != null) {
             sensorManager.registerListener(this, stepCounterSensor, SensorManager.SENSOR_DELAY_UI);
         }
@@ -70,19 +66,15 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                 settings.setSupportMultipleWindows(true);
                 settings.setJavaScriptCanOpenWindowsAutomatically(true);
 
-                // Expose Direct Hardware Bridge to JavaScript
                 webView.addJavascriptInterface(new HardwareStepBridge(), "AndroidHardwarePedometer");
 
-                // Send latest known steps immediately to Web app
-                dispatchStepUpdate(getStoredDailySteps());
+                // Immediately dispatch stored persistent footsteps on app launch or resume
+                int stored = getStoredTodaySteps();
+                if (stored > 0) {
+                    dispatchStepUpdate(stored);
+                }
             }
         } catch (Exception ignored) {}
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        // Sensor listener remains active or re-registers on resume
     }
 
     @Override
@@ -98,9 +90,8 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
         if (event.sensor.getType() == Sensor.TYPE_STEP_COUNTER) {
             int totalHardwareSteps = (int) event.values[0];
             this.lastRawHardwareSteps = totalHardwareSteps;
-            int dailySteps = calculateDailySteps(totalHardwareSteps);
-            this.currentDailySteps = dailySteps;
-            dispatchStepUpdate(dailySteps);
+            int steps = processHardwareSteps(totalHardwareSteps);
+            dispatchStepUpdate(steps);
         }
     }
 
@@ -108,38 +99,62 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     public void onAccuracyChanged(Sensor sensor, int accuracy) {}
 
     /**
-     * Calculate true daily footsteps relative to midnight baseline
+     * Strictly monotonic daily footsteps: steps can only increase or remain constant on same calendar day
      */
-    private int calculateDailySteps(int totalHardwareSteps) {
+    private synchronized int processHardwareSteps(int totalHardwareSteps) {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String todayStr = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
         String savedDate = prefs.getString(KEY_DATE, "");
-        int savedBaseline = prefs.getInt(KEY_BASELINE, -1);
+        int storedSteps = prefs.getInt(KEY_STORED_STEPS, 0);
+        int baseline = prefs.getInt(KEY_BASELINE, -1);
 
-        if (!todayStr.equals(savedDate) || savedBaseline == -1 || totalHardwareSteps < savedBaseline) {
-            // New day or phone reboot: establish new baseline
-            savedBaseline = totalHardwareSteps;
+        if (!todayStr.equals(savedDate)) {
+            // Midnight rollover: new calendar day starts at 0
+            baseline = totalHardwareSteps;
+            storedSteps = 0;
             prefs.edit()
                 .putString(KEY_DATE, todayStr)
-                .putInt(KEY_BASELINE, savedBaseline)
-                .putInt(KEY_LAST_STEPS, 0)
+                .putInt(KEY_BASELINE, baseline)
+                .putInt(KEY_STORED_STEPS, 0)
                 .apply();
             return 0;
         }
 
-        int todaySteps = totalHardwareSteps - savedBaseline;
-        prefs.edit().putInt(KEY_LAST_STEPS, todaySteps).apply();
-        return Math.max(0, todaySteps);
+        if (baseline == -1 || totalHardwareSteps < baseline) {
+            baseline = Math.max(0, totalHardwareSteps - storedSteps);
+            prefs.edit().putInt(KEY_BASELINE, baseline).apply();
+        }
+
+        int calculated = Math.max(storedSteps, totalHardwareSteps - baseline);
+        if (calculated > storedSteps) {
+            prefs.edit().putInt(KEY_STORED_STEPS, calculated).apply();
+        }
+        return calculated;
     }
 
-    private int getStoredDailySteps() {
+    public synchronized int getStoredTodaySteps() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String todayStr = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
         String savedDate = prefs.getString(KEY_DATE, "");
         if (todayStr.equals(savedDate)) {
-            return prefs.getInt(KEY_LAST_STEPS, this.currentDailySteps);
+            return prefs.getInt(KEY_STORED_STEPS, 0);
         }
-        return this.currentDailySteps;
+        return 0;
+    }
+
+    public synchronized void calibrateBaseline(int targetSteps) {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String todayStr = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+        int raw = lastRawHardwareSteps;
+        int baseline = raw > 0 ? Math.max(0, raw - targetSteps) : -1;
+
+        prefs.edit()
+            .putString(KEY_DATE, todayStr)
+            .putInt(KEY_STORED_STEPS, targetSteps)
+            .putInt(KEY_BASELINE, baseline)
+            .apply();
+
+        dispatchStepUpdate(targetSteps);
     }
 
     private void dispatchStepUpdate(int steps) {
@@ -164,13 +179,10 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
         }
     }
 
-    /**
-     * JavaScript Interface Bridge exposed as window.AndroidHardwarePedometer
-     */
     public class HardwareStepBridge {
         @JavascriptInterface
         public int getLiveSteps() {
-            return getStoredDailySteps();
+            return getStoredTodaySteps();
         }
 
         @JavascriptInterface
@@ -180,16 +192,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
 
         @JavascriptInterface
         public void setInitialBaseline(int currentSteps) {
-            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            String todayStr = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
-            int baseline = Math.max(0, lastRawHardwareSteps - currentSteps);
-            prefs.edit()
-                .putString(KEY_DATE, todayStr)
-                .putInt(KEY_BASELINE, baseline)
-                .putInt(KEY_LAST_STEPS, currentSteps)
-                .apply();
-            currentDailySteps = currentSteps;
-            dispatchStepUpdate(currentSteps);
+            calibrateBaseline(currentSteps);
         }
 
         @JavascriptInterface
