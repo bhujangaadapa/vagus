@@ -33,7 +33,7 @@ export class DataBridgeService {
   private readonly physicsEngine = inject(PhysicsEngineService);
 
   // Active user id
-  private activeUserId: string = 'pilot_athlete_01';
+  private activeUserId: string = '';
 
   public setActiveUserId(userId: string): void {
     this.activeUserId = userId;
@@ -54,13 +54,15 @@ export class DataBridgeService {
   public readonly todayLog$: Observable<DailyBiometricLog | null> = this.todayLogSubject.asObservable();
 
   constructor() {
-    // Instant offline-first hydration from localStorage on app boot / page refresh
-    const cached = this.loadFromLocalStorage(this.activeUserId);
-    if (cached.today) {
-      this.todayLogSubject.next(cached.today);
-    }
-    if (cached.history.length > 0) {
-      this.logsSubject.next(cached.history);
+    // Only hydrate from localStorage if an active authenticated userId exists
+    if (this.activeUserId) {
+      const cached = this.loadFromLocalStorage(this.activeUserId);
+      if (cached.today) {
+        this.todayLogSubject.next(cached.today);
+      }
+      if (cached.history.length > 0) {
+        this.logsSubject.next(cached.history);
+      }
     }
   }
 

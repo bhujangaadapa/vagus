@@ -1,0 +1,232 @@
+<div class="min-h-screen bg-[#06070a] text-slate-100 flex flex-col justify-center items-center px-4 py-8 max-w-md mx-auto relative overflow-hidden font-sans select-none">
+
+  <!-- Ambient Background Glows -->
+  <div class="absolute -top-32 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full bg-[#00F5A0]/10 blur-3xl pointer-events-none"></div>
+  <div class="absolute -bottom-32 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none"></div>
+
+  <!-- Header Branding & Hero Ring -->
+  <div class="flex flex-col items-center text-center space-y-4 mb-6 z-10">
+    <!-- Glowing WHOOP-Style Emblem -->
+    <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#00F5A0] via-cyan-500 to-indigo-600 p-[2px] whoop-pulse-logo flex items-center justify-center">
+      <div class="w-full h-full bg-[#06070a] rounded-[14px] flex items-center justify-center">
+        <span class="font-mono font-black text-2xl text-[#00F5A0] tracking-tighter">V</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="flex items-center justify-center gap-2">
+        <h1 class="font-mono font-extrabold text-2xl tracking-widest text-white">VAGUS</h1>
+        <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#00F5A0]/15 text-[#00F5A0] border border-[#00F5A0]/30 font-bold">
+          4.0
+        </span>
+      </div>
+      <p class="text-xs text-zinc-400 font-sans tracking-wide mt-1">
+        HUMAN PHYSIOLOGY // UNLOCKED
+      </p>
+    </div>
+
+    <!-- 3 Core Pillars Badge Strip -->
+    <div class="flex items-center gap-1.5 text-[10px] font-mono font-semibold">
+      <span class="px-2 py-0.5 rounded-full bg-white/[0.04] text-[#00F5A0] border border-[#00F5A0]/20">RECOVERY</span>
+      <span class="text-zinc-600">•</span>
+      <span class="px-2 py-0.5 rounded-full bg-white/[0.04] text-cyan-300 border border-cyan-500/20">STRAIN</span>
+      <span class="text-zinc-600">•</span>
+      <span class="px-2 py-0.5 rounded-full bg-white/[0.04] text-indigo-300 border border-indigo-500/20">SLEEP</span>
+    </div>
+  </div>
+
+  <!-- Main Authentication Card -->
+  <div class="w-full whoop-login-surface rounded-3xl p-6 space-y-5 z-10 shadow-2xl">
+    
+    <!-- Segmented Tab Switcher: SIGN IN vs CREATE ACCOUNT -->
+    <div class="p-1 rounded-2xl bg-black/50 border border-white/[0.06] flex items-center justify-between font-mono text-xs font-semibold">
+      <button
+        type="button"
+        (click)="setMode('login')"
+        class="flex-1 py-2 rounded-xl transition-all text-center cursor-pointer"
+        [ngClass]="activeMode() === 'login' ? 'bg-[#00F5A0] text-black font-bold shadow-md' : 'text-zinc-400 hover:text-white'"
+      >
+        SIGN IN
+      </button>
+
+      <button
+        type="button"
+        (click)="setMode('register')"
+        class="flex-1 py-2 rounded-xl transition-all text-center cursor-pointer"
+        [ngClass]="activeMode() === 'register' ? 'bg-[#00F5A0] text-black font-bold shadow-md' : 'text-zinc-400 hover:text-white'"
+      >
+        CREATE ACCOUNT
+      </button>
+    </div>
+
+    <!-- Error Message Banner -->
+    <div
+      *ngIf="errorMessage()"
+      class="p-3 rounded-2xl bg-rose-950/40 border border-rose-800/50 text-xs font-mono text-rose-300 flex items-center justify-between"
+    >
+      <span class="truncate mr-2">{{ errorMessage() }}</span>
+      <button (click)="errorMessage.set(null)" class="text-zinc-400 hover:text-white text-xs">✕</button>
+    </div>
+
+    <!-- Form -->
+    <form (submit)="$event.preventDefault(); submitForm()" class="space-y-4">
+      
+      <!-- Email Address -->
+      <div class="space-y-1 font-mono text-xs">
+        <label class="text-[10px] uppercase text-zinc-400 font-bold tracking-wider">Email Address</label>
+        <input
+          type="email"
+          required
+          placeholder="athlete@vagus.health"
+          [(ngModel)]="emailInput"
+          name="email"
+          autocomplete="email"
+          class="w-full px-3.5 py-2.5 rounded-2xl bg-black/60 border border-white/[0.08] text-white font-mono focus:border-[#00F5A0] focus:outline-none transition-colors"
+        />
+      </div>
+
+      <!-- Password -->
+      <div class="space-y-1 font-mono text-xs">
+        <label class="text-[10px] uppercase text-zinc-400 font-bold tracking-wider">Password</label>
+        <input
+          type="password"
+          required
+          placeholder="••••••••"
+          [(ngModel)]="passwordInput"
+          name="password"
+          autocomplete="current-password"
+          class="w-full px-3.5 py-2.5 rounded-2xl bg-black/60 border border-white/[0.08] text-white font-mono focus:border-[#00F5A0] focus:outline-none transition-colors"
+        />
+      </div>
+
+      <!-- Registration-Only Real Athlete Physiological Demographics -->
+      <div *ngIf="activeMode() === 'register'" class="space-y-3 pt-2 border-t border-white/[0.06] font-mono text-xs">
+        <div class="text-[10px] uppercase text-cyan-300 font-bold tracking-wider">
+          CALIBRATE YOUR ATHLETE PROFILE
+        </div>
+        <p class="text-[11px] text-zinc-400 font-sans leading-tight">
+          Enter your real physiology to calibrate your Tanaka MaxHR, Banister TRIMP curves, and active burn:
+        </p>
+
+        <!-- Biological Sex -->
+        <div class="space-y-1">
+          <label class="text-[10px] uppercase text-zinc-400">Biological Sex</label>
+          <div class="grid grid-cols-3 gap-1.5">
+            <button
+              type="button"
+              (click)="genderInput = 'male'"
+              class="py-1.5 rounded-xl border text-center transition-all cursor-pointer font-bold text-[11px]"
+              [ngClass]="genderInput === 'male' ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-black/40 border-white/[0.08] text-zinc-400'"
+            >
+              MALE
+            </button>
+            <button
+              type="button"
+              (click)="genderInput = 'female'"
+              class="py-1.5 rounded-xl border text-center transition-all cursor-pointer font-bold text-[11px]"
+              [ngClass]="genderInput === 'female' ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-black/40 border-white/[0.08] text-zinc-400'"
+            >
+              FEMALE
+            </button>
+            <button
+              type="button"
+              (click)="genderInput = 'other'"
+              class="py-1.5 rounded-xl border text-center transition-all cursor-pointer font-bold text-[11px]"
+              [ngClass]="genderInput === 'other' ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-black/40 border-white/[0.08] text-zinc-400'"
+            >
+              OTHER
+            </button>
+          </div>
+        </div>
+
+        <!-- Age, Weight, Height Grid -->
+        <div class="grid grid-cols-3 gap-2">
+          <div class="space-y-1">
+            <label class="text-[9px] uppercase text-zinc-400">Age</label>
+            <input
+              type="number"
+              min="12"
+              max="100"
+              [(ngModel)]="ageInput"
+              name="age"
+              placeholder="24"
+              class="w-full px-2.5 py-2 rounded-xl bg-black/60 border border-white/[0.08] text-white text-center font-mono focus:border-cyan-400 focus:outline-none"
+            />
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-[9px] uppercase text-zinc-400">Weight (kg)</label>
+            <input
+              type="number"
+              min="35"
+              max="250"
+              [(ngModel)]="weightInput"
+              name="weight"
+              placeholder="72"
+              class="w-full px-2.5 py-2 rounded-xl bg-black/60 border border-white/[0.08] text-white text-center font-mono focus:border-cyan-400 focus:outline-none"
+            />
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-[9px] uppercase text-zinc-400">Height (cm)</label>
+            <input
+              type="number"
+              min="120"
+              max="230"
+              [(ngModel)]="heightInput"
+              name="height"
+              placeholder="178"
+              class="w-full px-2.5 py-2 rounded-xl bg-black/60 border border-white/[0.08] text-white text-center font-mono focus:border-cyan-400 focus:outline-none"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Primary Action Button -->
+      <button
+        type="submit"
+        [disabled]="isSubmitting()"
+        class="w-full py-3.5 px-4 rounded-2xl bg-[#00F5A0] hover:bg-[#00D284] text-black font-mono text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-emerald-950/50 active:scale-[0.99] cursor-pointer disabled:opacity-50"
+      >
+        <span *ngIf="isSubmitting()">AUTHENTICATING...</span>
+        <span *ngIf="!isSubmitting()">
+          {{ activeMode() === 'login' ? 'SIGN IN WITH EMAIL' : 'CREATE ATHLETE ACCOUNT' }}
+        </span>
+      </button>
+
+      <!-- Divider -->
+      <div class="relative flex items-center justify-center my-3">
+        <div class="border-t border-white/[0.06] w-full"></div>
+        <span class="bg-[#06070a] px-3 font-mono text-[9px] text-zinc-500 uppercase tracking-widest absolute">
+          OR
+        </span>
+      </div>
+
+      <!-- Secondary: Continue with Google (Web) / Explanatory (Native) -->
+      <button
+        type="button"
+        (click)="loginWithGoogle()"
+        [disabled]="isSubmitting()"
+        class="w-full py-3 px-4 rounded-2xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] text-white font-mono text-xs font-semibold tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+      >
+        <svg class="w-4 h-4" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/>
+          <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24Z"/>
+          <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15Z"/>
+          <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"/>
+        </svg>
+        <span>CONTINUE WITH GOOGLE</span>
+      </button>
+
+    </form>
+  </div>
+
+  <!-- Privacy & Zero-Cloud Guarantee -->
+  <div class="mt-6 text-center text-[10px] font-mono text-zinc-500 max-w-xs space-y-1">
+    <p>100% PRIVATE BIOMETRICS • ZERO SUBSCRIPTIONS</p>
+    <p class="text-[9px] text-zinc-600 font-sans">
+      Compatible with Polar H7/H10 BLE ECG, Camera PPG, Xiaomi Bands, and native motion pedometers.
+    </p>
+  </div>
+
+</div>

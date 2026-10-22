@@ -30,7 +30,7 @@ export class DashboardComponent implements OnInit {
 
   // Active user ID derived from Auth state
   public readonly activeUserId = computed(() => {
-    return this.authService.currentUser()?.uid || 'pilot_athlete_01';
+    return this.authService.currentUser()?.uid || '';
   });
 
   // Reactive state signals
@@ -217,6 +217,11 @@ export class DashboardComponent implements OnInit {
     // Whenever active user changes, sync DataBridge and reload daily logs
     effect(() => {
       const uid = this.activeUserId();
+      if (!uid) {
+        this.historyLogs.set([]);
+        this.todayLog.set(null);
+        return;
+      }
       this.dataBridge.setActiveUserId(uid);
       this.bleHR.setActiveUserId(uid);
       this.ppg.setActiveUserId(uid);
@@ -263,15 +268,13 @@ export class DashboardComponent implements OnInit {
   }
 
   public async loginDemo(): Promise<void> {
-    const user = await this.authService.loginAsDemoAthlete();
-    if (user) {
-      await this.seedInitialData();
-    }
+    await this.authService.loginAsDemoAthlete();
   }
 
   public async logout(): Promise<void> {
     await this.authService.logout();
-    await this.seedInitialData();
+    this.todayLog.set(null);
+    this.historyLogs.set([]);
   }
 
   public async togglePhoneSteps(): Promise<void> {

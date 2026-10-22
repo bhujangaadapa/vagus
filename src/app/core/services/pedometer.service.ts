@@ -37,7 +37,7 @@ export class PedometerService {
   private recentStepTimes: number[] = [];
 
   // Active user / date context
-  private currentUserId = 'pilot_athlete_01';
+  private currentUserId = '';
   private currentDateStr = new Date().toISOString().slice(0, 10);
   private readonly storageKey = 'vagus_step_counter_state';
 

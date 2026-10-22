@@ -45,58 +45,28 @@
     </div>
   </header>
 
-  <!-- 2. Athlete Profile & Cloud Sync Strip -->
+  <!-- 2. Authenticated Athlete Profile & Cloud Sync Strip -->
   <section class="px-5 py-2.5 bg-gradient-to-r from-white/[0.02] to-transparent border-b border-white/[0.05] flex items-center justify-between text-[11px] font-mono">
-    <!-- Logged in state -->
-    <div *ngIf="authService.currentUser() as user; else guestAuthStrip" class="flex items-center gap-2 truncate">
+    <div *ngIf="authService.currentUser() as user" class="flex items-center gap-2 truncate">
       <div class="w-5 h-5 rounded-full bg-white/[0.08] border border-white/[0.1] flex items-center justify-center text-[10px] text-[#00F5A0] font-bold">
         {{ (user.displayName || user.email || 'A').charAt(0).toUpperCase() }}
       </div>
-      <span class="text-zinc-300 font-semibold truncate max-w-[130px]">{{ user.displayName || user.email }}</span>
+      <span class="text-zinc-200 font-semibold truncate max-w-[140px]">{{ user.displayName || user.email }}</span>
       <span class="text-zinc-600">•</span>
-      <span class="text-zinc-400">{{ athleteDemographics().age }}y / {{ athleteDemographics().weightKg }}kg</span>
+      <button (click)="openProfileModal()" class="text-cyan-400 hover:underline">
+        {{ athleteDemographics().age }}y / {{ athleteDemographics().weightKg }}kg
+      </button>
     </div>
 
-    <!-- Guest / Sign In State -->
-    <ng-template #guestAuthStrip>
-      <div class="flex items-center gap-2 text-zinc-400">
-        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-        <span>GUEST ATHLETE</span>
-        <span class="text-zinc-600">•</span>
-        <button (click)="openProfileModal()" class="text-cyan-400 hover:underline">
-          {{ athleteDemographics().gender | uppercase }} {{ athleteDemographics().age }}y
-        </button>
-      </div>
-    </ng-template>
-
-    <!-- Cloud Sync & Login Shortcuts -->
+    <!-- Sign Out Button -->
     <div class="flex items-center gap-1.5 shrink-0">
-      <div *ngIf="authService.currentUser(); else authButtons">
-        <button
-          type="button"
-          (click)="logout()"
-          class="text-[9px] text-zinc-400 hover:text-rose-400 px-2 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] transition-colors"
-        >
-          LOGOUT
-        </button>
-      </div>
-      <ng-template #authButtons>
-        <button
-          type="button"
-          (click)="loginGoogle()"
-          [disabled]="authService.isLoading()"
-          class="text-[9px] font-bold text-white px-2 py-0.5 rounded bg-white/[0.08] hover:bg-white/[0.12] border border-white/[0.1] transition-colors cursor-pointer"
-        >
-          GOOGLE
-        </button>
-        <button
-          type="button"
-          (click)="showEmailLoginModal.set(true)"
-          class="text-[9px] font-bold text-cyan-300 px-2 py-0.5 rounded bg-cyan-950/40 hover:bg-cyan-900/40 border border-cyan-800/50 transition-colors cursor-pointer"
-        >
-          EMAIL
-        </button>
-      </ng-template>
+      <button
+        type="button"
+        (click)="logout()"
+        class="text-[9px] font-mono text-zinc-400 hover:text-rose-400 px-2 py-0.8 rounded-lg bg-white/[0.04] border border-white/[0.06] transition-colors cursor-pointer"
+      >
+        LOGOUT
+      </button>
     </div>
   </section>
 

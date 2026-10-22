@@ -38,7 +38,7 @@ export class CameraPpgService {
   });
   public readonly errorMessage = signal<string | null>(null);
 
-  private activeUserId = 'pilot_athlete_01';
+  private activeUserId = '';
 
   public setActiveUserId(uid: string): void {
     this.activeUserId = uid;

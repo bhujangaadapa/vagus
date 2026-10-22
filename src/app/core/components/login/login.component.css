@@ -1,0 +1,29 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background-color: #06070a;
+  color: #f1f5f9;
+}
+
+.whoop-login-surface {
+  background: linear-gradient(180deg, rgba(16, 21, 30, 0.85) 0%, rgba(10, 13, 19, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+@keyframes logo-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 25px rgba(0, 245, 160, 0.35);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 45px rgba(0, 245, 160, 0.55);
+  }
+}
+
+.whoop-pulse-logo {
+  animation: logo-pulse 3s infinite ease-in-out;
+}

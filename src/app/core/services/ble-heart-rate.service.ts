@@ -46,7 +46,7 @@ export class BleHeartRateService {
   public readonly lastRRIntervalMs = signal<number | null>(null);
   public readonly errorMessage = signal<string | null>(null);
 
-  private activeUserId = 'pilot_athlete_01';
+  private activeUserId = '';
 
   public setActiveUserId(uid: string): void {
     this.activeUserId = uid;
