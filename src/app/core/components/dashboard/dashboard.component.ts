@@ -5,7 +5,7 @@ import { AuthService } from '../../services/auth.service';
 import { DataBridgeService } from '../../services/data-bridge.service';
 import { PhysicsEngineService } from '../../services/physics-engine.service';
 import { PedometerService } from '../../services/pedometer.service';
-import { BleHeartRateService } from '../../services/ble-heart-rate.service';
+import { BleHeartRateService, BleWorkoutTimelinePoint } from '../../services/ble-heart-rate.service';
 import { CameraPpgService } from '../../services/camera-ppg.service';
 import { XiaomiIntegrationService } from '../../services/xiaomi-integration.service';
 import { DailyBiometricLog, JournalHabits } from '../../models/biometrics.interface';
@@ -232,6 +232,12 @@ export class DashboardComponent implements OnInit {
         }
       });
     });
+
+    // Synchronize athlete demographics to BLE heart rate service for exact Digifit zones
+    effect(() => {
+      const age = this.athleteDemographics().age;
+      this.bleHR.setAthleteAge(age);
+    });
   }
 
   public ngOnInit(): void {
@@ -347,10 +353,107 @@ export class DashboardComponent implements OnInit {
 
   public toggleWorkoutTracker(): void {
     if (this.bleHR.workoutSession().isActive) {
-      this.bleHR.stopWorkout(true);
+      this.bleHR.finishWorkoutAndStartRecoveryTest();
     } else {
       this.bleHR.startWorkout();
     }
+  }
+
+  public finishWorkoutWithVagalTest(): void {
+    this.bleHR.finishWorkoutAndStartRecoveryTest();
+  }
+
+  public directStopWorkout(): void {
+    this.bleHR.stopWorkout(true);
+  }
+
+  public completeOrSkipVagalTest(): void {
+    this.bleHR.completeRecoveryTestAndCommit();
+  }
+
+  public dismissWorkoutSummary(): void {
+    this.bleHR.dismissWorkoutSummary();
+  }
+
+  // Digifit Zone Ranges computed from athlete's calibrated max HR
+  public readonly zoneRanges = computed(() => {
+    const max = this.calibratedMaxHR();
+    return {
+      z1: `${Math.round(max * 0.50)}–${Math.round(max * 0.60) - 1}`,
+      z2: `${Math.round(max * 0.60)}–${Math.round(max * 0.70) - 1}`,
+      z3: `${Math.round(max * 0.70)}–${Math.round(max * 0.80) - 1}`,
+      z4: `${Math.round(max * 0.80)}–${Math.round(max * 0.90) - 1}`,
+      z5: `${Math.round(max * 0.90)}+`,
+    };
+  });
+
+  public formatZoneDuration(totalSeconds: number): string {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  public getZonePercent(zoneSec: number, totalSec: number): number {
+    if (!totalSec || totalSec <= 0) return 0;
+    return Math.round((zoneSec / totalSec) * 100);
+  }
+
+  // Generates SVG path for the Digifit multi-colored timeline ribbon
+  public getWorkoutSvgPath(timeline: BleWorkoutTimelinePoint[]): string {
+    if (!timeline || timeline.length < 2) {
+      return 'M 0 50 L 320 50';
+    }
+    const width = 320;
+    const height = 90;
+    const paddingY = 8;
+    const usableH = height - paddingY * 2;
+
+    const bpms = timeline.map((p) => p.bpm);
+    const minB = Math.max(40, Math.min(...bpms) - 5);
+    const maxB = Math.max(minB + 20, Math.max(...bpms) + 5);
+    const range = maxB - minB;
+
+    const totalPts = timeline.length;
+    return timeline.reduce((acc, pt, i) => {
+      const x = (i / (totalPts - 1)) * width;
+      const normalizedY = (pt.bpm - minB) / range;
+      const y = height - paddingY - normalizedY * usableH;
+      const roundedX = Math.round(x * 10) / 10;
+      const roundedY = Math.round(y * 10) / 10;
+      return i === 0 ? `M ${roundedX} ${roundedY}` : `${acc} L ${roundedX} ${roundedY}`;
+    }, '');
+  }
+
+  public getWorkoutSvgFillPath(timeline: BleWorkoutTimelinePoint[]): string {
+    const linePath = this.getWorkoutSvgPath(timeline);
+    return `${linePath} L 320 90 L 0 90 Z`;
+  }
+
+  // Generates SVG path for 60-second Vagal Heart Rate Recovery Test
+  public getRecoverySvgPath(samples: { sec: number; bpm: number }[]): string {
+    if (!samples || samples.length < 2) {
+      return 'M 0 30 L 320 60';
+    }
+    const width = 320;
+    const height = 80;
+    const startBpm = samples[0].bpm;
+    const currentMin = Math.min(...samples.map((s) => s.bpm));
+    const range = Math.max(15, startBpm - currentMin + 5);
+
+    return samples.reduce((acc, pt, i) => {
+      const x = (pt.sec / 60) * width;
+      const drop = startBpm - pt.bpm;
+      const y = 10 + (Math.max(0, drop) / range) * (height - 20);
+      const roundedX = Math.round(x * 10) / 10;
+      const roundedY = Math.round(y * 10) / 10;
+      return i === 0 ? `M ${roundedX} ${roundedY}` : `${acc} L ${roundedX} ${roundedY}`;
+    }, '');
+  }
+
+  public getRecoverySvgFillPath(samples: { sec: number; bpm: number }[]): string {
+    const line = this.getRecoverySvgPath(samples);
+    const lastX = samples && samples.length > 0 ? (samples[samples.length - 1].sec / 60) * 320 : 320;
+    return `${line} L ${Math.round(lastX)} 80 L 0 80 Z`;
   }
 
   // Camera PPG Actions
