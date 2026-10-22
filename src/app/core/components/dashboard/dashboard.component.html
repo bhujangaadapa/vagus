@@ -1,0 +1,324 @@
+<div class="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-start max-w-md mx-auto shadow-2xl border-x border-slate-900">
+  
+  <!-- Header Telemetry Bar -->
+  <header class="px-5 py-4 border-b border-slate-900 flex items-center justify-between bg-slate-950/80 backdrop-blur sticky top-0 z-20">
+    <div class="flex items-center gap-2">
+      <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
+      <h1 class="font-mono tracking-widest text-xs uppercase font-semibold text-slate-300">
+        ANTIGRAVITY // TELEMETRY
+      </h1>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button
+        (click)="requestPermissions()"
+        class="text-[10px] font-mono px-2 py-1 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
+        title="Sync Device Sensors"
+      >
+        <span *ngIf="permissionGranted(); else notSynced" class="text-emerald-400">● SYNCED</span>
+        <ng-template #notSynced>CONNECT</ng-template>
+      </button>
+
+      <button
+        (click)="seedInitialData()"
+        [disabled]="isSeeding()"
+        class="text-[10px] font-mono px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+      >
+        {{ isSeeding() ? 'SEEDING...' : 'RESEED 30D' }}
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Scrollable Diagnostics Viewport -->
+  <main class="flex-1 p-5 space-y-6 overflow-y-auto">
+
+    <!-- Date & Telemetry Status Banner -->
+    <div class="flex items-baseline justify-between text-xs font-mono text-slate-400">
+      <span>LOGGED: {{ todayLog()?.date || 'NOCTURNAL EPOCH' }}</span>
+      <span class="tracking-wider text-[11px] uppercase" [ngClass]="recoveryColor().text">
+        {{ recoveryStatusText() }}
+      </span>
+    </div>
+
+    <!-- DIAGNOSTIC BLOCK 1: Central Radial Recovery Gauge -->
+    <section class="relative flex flex-col items-center justify-center p-6 rounded-2xl bg-gradient-to-b from-slate-900/90 to-slate-950 border border-slate-800/80 shadow-lg">
+      <div class="relative w-48 h-48 flex items-center justify-center">
+        <!-- SVG Radial Progress Ring -->
+        <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 160 160">
+          <!-- Background track -->
+          <circle
+            cx="80"
+            cy="80"
+            r="72"
+            stroke="currentColor"
+            stroke-width="9"
+            fill="transparent"
+            class="text-slate-800/50"
+          />
+          <!-- Progress indicator -->
+          <circle
+            cx="80"
+            cy="80"
+            r="72"
+            [attr.stroke]="recoveryColor().stroke"
+            stroke-width="9"
+            stroke-linecap="round"
+            fill="transparent"
+            [style.strokeDasharray]="circumference"
+            [style.strokeDashoffset]="strokeDashoffset()"
+            class="transition-all duration-700 ease-out"
+          />
+        </svg>
+
+        <!-- Center Value Display -->
+        <div class="absolute flex flex-col items-center justify-center text-center">
+          <span class="text-5xl font-mono font-bold tracking-tighter" [ngClass]="recoveryColor().text">
+            {{ recoveryScore() }}<span class="text-2xl font-light">%</span>
+          </span>
+          <span class="text-[10px] font-mono tracking-widest text-slate-400 uppercase mt-0.5">
+            RECOVERY
+          </span>
+        </div>
+      </div>
+
+      <!-- Overnight Vagal Telemetry Strip -->
+      <div class="grid grid-cols-3 w-full mt-6 pt-4 border-t border-slate-800/60 text-center font-mono text-xs">
+        <div>
+          <div class="text-[10px] text-slate-500 uppercase tracking-wider">RMSSD</div>
+          <div class="text-slate-200 font-semibold text-sm mt-0.5">
+            {{ todayLog()?.biometrics?.overnightRMSSD || 0 }} <span class="text-[10px] text-slate-500 font-normal">ms</span>
+          </div>
+        </div>
+        <div class="border-x border-slate-800/60">
+          <div class="text-[10px] text-slate-500 uppercase tracking-wider">RESTING HR</div>
+          <div class="text-slate-200 font-semibold text-sm mt-0.5">
+            {{ todayLog()?.biometrics?.restingHR || 0 }} <span class="text-[10px] text-slate-500 font-normal">bpm</span>
+          </div>
+        </div>
+        <div>
+          <div class="text-[10px] text-slate-500 uppercase tracking-wider">SLEEP</div>
+          <div class="text-slate-200 font-semibold text-sm mt-0.5">
+            {{ formatMinutesToHours(todayLog()?.biometrics?.sleepMinutes || 0) }}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DIAGNOSTIC BLOCK 2: 0-21 Logarithmic Strain Gauge vs Daily Target -->
+    <section class="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 shadow-md">
+      <div class="flex items-baseline justify-between mb-3 font-mono">
+        <div>
+          <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">DAY STRAIN</span>
+          <span class="text-xs text-slate-500 ml-1.5">(BANISTER TRIMP)</span>
+        </div>
+        <div class="text-right">
+          <span class="text-2xl font-bold text-cyan-400">{{ strainScore() }}</span>
+          <span class="text-xs text-slate-500"> / 21.0</span>
+        </div>
+      </div>
+
+      <!-- Logarithmic Strain Scale Track -->
+      <div class="relative w-full h-3 bg-slate-800 rounded-full overflow-hidden my-2">
+        <!-- Target Band Range Indicator -->
+        <div
+          class="absolute top-0 bottom-0 bg-cyan-950/80 border-x border-cyan-500/40"
+          [style.left.%]="(targetStrain().min / 21.0) * 100"
+          [style.width.%]="((targetStrain().max - targetStrain().min) / 21.0) * 100"
+          title="Recommended Target Band"
+        ></div>
+
+        <!-- Current Strain Level Bar -->
+        <div
+          class="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-teal-300 rounded-full transition-all duration-700 ease-out"
+          [style.width.%]="(strainScore() / 21.0) * 100"
+        ></div>
+      </div>
+
+      <!-- Scale Labels & Prescriptive Strain Target -->
+      <div class="flex justify-between items-center text-[10px] font-mono text-slate-400 mt-2">
+        <span>0.0 REST</span>
+        <div class="text-center font-semibold text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/50">
+          TARGET: {{ targetStrain().target }} ({{ targetStrain().min }} - {{ targetStrain().max }})
+        </div>
+        <span>21.0 MAX</span>
+      </div>
+    </section>
+
+    <!-- DIAGNOSTIC BLOCK 3: Advanced KPIs Grid with Micro-Explanations -->
+    <section class="space-y-3">
+      <div class="text-[11px] font-mono tracking-widest text-slate-400 uppercase font-semibold">
+        ADVANCED PHYSIOLOGICAL KPIS
+      </div>
+
+      <div class="grid grid-cols-1 gap-3">
+        
+        <!-- KPI 1: Cumulative Fatigue Drag -->
+        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-colors">
+          <div class="flex items-center justify-between font-mono mb-1">
+            <span class="text-xs text-slate-300 uppercase tracking-wide">Cumulative Fatigue Drag</span>
+            <span
+              class="text-sm font-bold"
+              [ngClass]="(todayLog()?.advancedKPIs?.cumulativeFatigueDrag ?? 0) > 0 ? 'text-amber-400' : 'text-emerald-400'"
+            >
+              {{ (todayLog()?.advancedKPIs?.cumulativeFatigueDrag ?? 0) > 0 ? '+' : '' }}{{ todayLog()?.advancedKPIs?.cumulativeFatigueDrag }}
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-relaxed font-sans">
+            <span *ngIf="(todayLog()?.advancedKPIs?.cumulativeFatigueDrag ?? 0) > 0; else dragPositive">
+              7-day cardiac strain outpaces systemic restitution. Active parasympathetic deficit signals elevated risk of overreaching.
+            </span>
+            <ng-template #dragPositive>
+              Restitution buffer intact. 7-day allostatic balance indicates low systemic debt and high adaptation capacity.
+            </ng-template>
+          </p>
+        </div>
+
+        <!-- KPI 2: Autonomic Steering Index -->
+        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-colors">
+          <div class="flex items-center justify-between font-mono mb-1">
+            <span class="text-xs text-slate-300 uppercase tracking-wide">Autonomic Steering Index</span>
+            <span
+              class="text-sm font-bold"
+              [ngClass]="(todayLog()?.advancedKPIs?.autonomicSteeringIndex ?? 0) >= 0.1 ? 'text-emerald-400' : 'text-rose-400'"
+            >
+              {{ todayLog()?.advancedKPIs?.autonomicSteeringIndex }}
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-relaxed font-sans">
+            <span *ngIf="(todayLog()?.advancedKPIs?.autonomicSteeringIndex ?? 0) >= 0.1; else steeringSympathetic">
+              Vagal brake dominant [ln(RMSSD/RHR)*10]. Parasympathetic nervous system maintains anti-inflammatory tone and efficient cardiovascular deceleration.
+            </span>
+            <ng-template #steeringSympathetic>
+              Sympathetic overdrive detected. Diminished vagal tone indicates autonomic tension or incomplete post-exercise glycogen replenishment.
+            </ng-template>
+          </p>
+        </div>
+
+        <!-- KPI 3: Sleep Efficiency Coefficient -->
+        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-colors">
+          <div class="flex items-center justify-between font-mono mb-1">
+            <span class="text-xs text-slate-300 uppercase tracking-wide">Sleep Efficiency Coefficient</span>
+            <span
+              class="text-sm font-bold"
+              [ngClass]="(todayLog()?.advancedKPIs?.sleepEfficiencyCoefficient ?? 0) >= 0.40 ? 'text-cyan-400' : 'text-amber-400'"
+            >
+              {{ todayLog()?.advancedKPIs?.sleepEfficiencyCoefficient }}
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-relaxed font-sans">
+            <span *ngIf="(todayLog()?.advancedKPIs?.sleepEfficiencyCoefficient ?? 0) >= 0.40; else sleepFragmented">
+              Restorative architecture density consolidated. High proportion of Slow-Wave Deep and REM sleep with nocturnal bradycardia.
+            </span>
+            <ng-template #sleepFragmented>
+              Sleep architecture diluted or elevated nocturnal sleeping heart rate (avg {{ todayLog()?.biometrics?.avgSleepHR }} bpm) limiting nervous system reset.
+            </ng-template>
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- INTERACTIVE LIFESTYLE JOURNAL: Instant Recalculation Engine -->
+    <section class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/90 shadow-md">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-xs font-mono font-semibold uppercase tracking-wider text-slate-300">
+          MORNING LIFESTYLE JOURNAL
+        </h2>
+        <span class="text-[10px] font-mono text-emerald-400">INSTANT CORRELATION</span>
+      </div>
+      <p class="text-[11px] text-slate-400 mb-4">
+        Toggle evening or morning habits to simulate instantaneous physiological restitution shifts.
+      </p>
+
+      <div class="grid grid-cols-2 gap-2.5">
+        <!-- Habit 1: Drank Alcohol -->
+        <button
+          type="button"
+          (click)="toggleHabit('drankAlcohol')"
+          [ngClass]="todayLog()?.journalHabits?.drankAlcohol ? 'bg-rose-500/20 border-rose-500/50 text-rose-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'"
+          class="flex items-center justify-between p-3 rounded-xl border text-xs font-mono transition-all text-left"
+        >
+          <div>
+            <div class="font-medium">ALCOHOL</div>
+            <div class="text-[9px] text-slate-500 mt-0.5">-25% HRV / +5 RHR</div>
+          </div>
+          <div class="w-3.5 h-3.5 rounded-full flex items-center justify-center border" [ngClass]="todayLog()?.journalHabits?.drankAlcohol ? 'bg-rose-500 border-rose-400' : 'border-slate-700'">
+            <span *ngIf="todayLog()?.journalHabits?.drankAlcohol" class="text-[9px] text-slate-950 font-bold">✓</span>
+          </div>
+        </button>
+
+        <!-- Habit 2: Late Meal -->
+        <button
+          type="button"
+          (click)="toggleHabit('lateMeal')"
+          [ngClass]="todayLog()?.journalHabits?.lateMeal ? 'bg-amber-500/20 border-amber-500/50 text-amber-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'"
+          class="flex items-center justify-between p-3 rounded-xl border text-xs font-mono transition-all text-left"
+        >
+          <div>
+            <div class="font-medium">LATE MEAL</div>
+            <div class="text-[9px] text-slate-500 mt-0.5">-12% HRV / +3 HR</div>
+          </div>
+          <div class="w-3.5 h-3.5 rounded-full flex items-center justify-center border" [ngClass]="todayLog()?.journalHabits?.lateMeal ? 'bg-amber-500 border-amber-400' : 'border-slate-700'">
+            <span *ngIf="todayLog()?.journalHabits?.lateMeal" class="text-[9px] text-slate-950 font-bold">✓</span>
+          </div>
+        </button>
+
+        <!-- Habit 3: Sunlight -->
+        <button
+          type="button"
+          (click)="toggleHabit('viewedSunlight')"
+          [ngClass]="todayLog()?.journalHabits?.viewedSunlight ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'"
+          class="flex items-center justify-between p-3 rounded-xl border text-xs font-mono transition-all text-left"
+        >
+          <div>
+            <div class="font-medium">SUNLIGHT</div>
+            <div class="text-[9px] text-slate-500 mt-0.5">+15% DEEP SLEEP</div>
+          </div>
+          <div class="w-3.5 h-3.5 rounded-full flex items-center justify-center border" [ngClass]="todayLog()?.journalHabits?.viewedSunlight ? 'bg-emerald-500 border-emerald-400' : 'border-slate-700'">
+            <span *ngIf="todayLog()?.journalHabits?.viewedSunlight" class="text-[9px] text-slate-950 font-bold">✓</span>
+          </div>
+        </button>
+
+        <!-- Habit 4: Caffeine Post 2PM -->
+        <button
+          type="button"
+          (click)="toggleHabit('caffeineAfter2PM')"
+          [ngClass]="todayLog()?.journalHabits?.caffeineAfter2PM ? 'bg-purple-500/20 border-purple-500/50 text-purple-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'"
+          class="flex items-center justify-between p-3 rounded-xl border text-xs font-mono transition-all text-left"
+        >
+          <div>
+            <div class="font-medium">CAFFEINE >2PM</div>
+            <div class="text-[9px] text-slate-500 mt-0.5">ADENOSINE BLOCK</div>
+          </div>
+          <div class="w-3.5 h-3.5 rounded-full flex items-center justify-center border" [ngClass]="todayLog()?.journalHabits?.caffeineAfter2PM ? 'bg-purple-500 border-purple-400' : 'border-slate-700'">
+            <span *ngIf="todayLog()?.journalHabits?.caffeineAfter2PM" class="text-[9px] text-slate-950 font-bold">✓</span>
+          </div>
+        </button>
+      </div>
+    </section>
+
+    <!-- 7-DAY HISTORICAL TELEMETRY TREND SPARKBARS -->
+    <section class="p-5 rounded-2xl bg-slate-900/50 border border-slate-800/60">
+      <div class="flex items-baseline justify-between mb-3 text-xs font-mono">
+        <span class="text-slate-400 uppercase font-semibold">7-DAY RECOVERY HISTORY</span>
+        <span class="text-[10px] text-slate-500">SYSTEMIC EQUILIBRIUM</span>
+      </div>
+
+      <div class="grid grid-cols-7 gap-1.5 h-24 items-end pt-2">
+        <div *ngFor="let item of recentLogs()" class="flex flex-col items-center gap-1.5 h-full justify-end group">
+          <!-- Recovery Bar with Height % -->
+          <div
+            class="w-full rounded-sm transition-all duration-300 relative"
+            [ngClass]="item.scores.calculatedRecovery > 66 ? 'bg-emerald-400' : item.scores.calculatedRecovery >= 34 ? 'bg-amber-400' : 'bg-rose-500'"
+            [style.height.%]="item.scores.calculatedRecovery"
+            [title]="item.date + ': Recovery ' + item.scores.calculatedRecovery + '%, Strain ' + item.scores.calculatedStrain"
+          ></div>
+          <span class="text-[9px] font-mono text-slate-500 truncate">
+            {{ item.date.slice(8) }}
+          </span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
