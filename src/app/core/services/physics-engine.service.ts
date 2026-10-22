@@ -66,6 +66,16 @@ export class PhysicsEngineService {
   }
 
   /**
+   * Calculate Calibrated Maximum Heart Rate using the Tanaka Equation
+   * Formula: 208 - (0.7 * age)
+   * Clinically superior to the crude 220 - age formula.
+   */
+  public calculateMaxHeartRate(age: number): number {
+    const safeAge = Math.max(12, Math.min(100, age));
+    return Math.round(208 - (0.7 * safeAge));
+  }
+
+  /**
    * 3. Calculate Accumulated Strain via Banister's TRIMP Algorithm
    * Heart rate reserve is integrated across temporal samples and asymptotically mapped
    * onto a logarithmic scale bound strictly between 0.0 and 21.0:
@@ -74,12 +84,14 @@ export class PhysicsEngineService {
    * @param heartRateSamples Heart rate readings sampled across the recording epoch (bpm).
    * @param rhr Individual resting heart rate (bpm).
    * @param maxHR Individual maximum physiological heart rate (bpm).
+   * @param gender Biological gender for Banister exponential factor ('male' | 'female' | 'other').
    * @returns Accumulated strain value between 0.0 and 21.0.
    */
   public calculateAccumulatedStrain(
     heartRateSamples: number[],
     rhr: number,
-    maxHR: number
+    maxHR: number,
+    gender: 'male' | 'female' | 'other' = 'male'
   ): number {
     if (!heartRateSamples || heartRateSamples.length === 0) {
       return 0.0;
@@ -87,6 +99,12 @@ export class PhysicsEngineService {
 
     const heartRateRange = Math.max(1, maxHR - rhr);
     let totalTrimp = 0.0;
+
+    // Banister gender constants:
+    // Male: y = 0.64 * e^(1.92 * deltaHR)
+    // Female: y = 0.86 * e^(1.67 * deltaHR)
+    const factorB = gender === 'female' ? 0.86 : 0.64;
+    const factorK = gender === 'female' ? 1.67 : 1.92;
 
     // Process each sample assuming a 1-minute integration step per sample
     for (let i = 0; i < heartRateSamples.length; i++) {
@@ -97,9 +115,7 @@ export class PhysicsEngineService {
         const fractionalReserve = (currentBpm - rhr) / heartRateRange;
         const boundedFraction = Math.min(1.0, Math.max(0.0, fractionalReserve));
 
-        // Banister's TRIMP formula increment for 1 minute:
-        // duration * deltaHR * 0.64 * e^(1.92 * deltaHR)
-        const sampleTrimp = boundedFraction * 0.64 * Math.exp(1.92 * boundedFraction);
+        const sampleTrimp = boundedFraction * factorB * Math.exp(factorK * boundedFraction);
         totalTrimp += sampleTrimp;
       }
     }
@@ -108,6 +124,39 @@ export class PhysicsEngineService {
     const strain = 21.0 * (1.0 - Math.exp(-totalTrimp / 25.0));
 
     return Math.round(Math.min(21.0, Math.max(0.0, strain)) * 10) / 10;
+  }
+
+  /**
+   * Calculate Biomechanical Stride Length from Height & Gender
+   */
+  public calculateStrideLengthMeters(
+    heightCm: number,
+    gender: 'male' | 'female' | 'other' = 'male'
+  ): number {
+    const ratio = gender === 'female' ? 0.413 : 0.415;
+    const stride = (heightCm * ratio) / 100.0;
+    return Math.round(stride * 100) / 100;
+  }
+
+  /**
+   * Calculate Active Step Caloric Expenditure adjusted for Body Weight
+   */
+  public calculateStepCalories(steps: number, weightKg: number): number {
+    const weightFactor = Math.max(40, weightKg) / 70.0;
+    return Math.round(steps * 0.04 * weightFactor);
+  }
+
+  /**
+   * Calculate Basal Metabolic Rate (BMR) via Mifflin-St Jeor Equation
+   */
+  public calculateBMR(
+    weightKg: number,
+    heightCm: number,
+    age: number,
+    gender: 'male' | 'female' | 'other' = 'male'
+  ): number {
+    const base = (10 * weightKg) + (6.25 * heightCm) - (5 * age);
+    return Math.round(gender === 'female' ? base - 161 : base + 5);
   }
 
   /**

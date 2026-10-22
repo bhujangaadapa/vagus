@@ -17,6 +17,7 @@ import { DailyBiometricLog, JournalHabits } from '../../models/biometrics.interf
   styleUrls: ['./dashboard.component.css'],
 })
 export class DashboardComponent implements OnInit {
+  public readonly Math = Math;
   public readonly authService = inject(AuthService);
   private readonly dataBridge = inject(DataBridgeService);
   private readonly physicsEngine = inject(PhysicsEngineService);
@@ -40,7 +41,21 @@ export class DashboardComponent implements OnInit {
   public readonly recoveryScore = computed(() => this.todayLog()?.scores.calculatedRecovery ?? 0);
   public readonly strainScore = computed(() => this.todayLog()?.scores.calculatedStrain ?? 0.0);
 
-  // Live Step telemetry
+  // Athlete Demographics
+  public readonly athleteDemographics = computed(() => {
+    return this.authService.userProfile()?.demographics || {
+      gender: 'male' as const,
+      age: 26,
+      weightKg: 75,
+      heightCm: 180,
+    };
+  });
+
+  public readonly calibratedMaxHR = computed(() => {
+    return this.authService.userProfile()?.baseline.maxHR || this.physicsEngine.calculateMaxHeartRate(this.athleteDemographics().age);
+  });
+
+  // Live Step telemetry calibrated with real height & weight
   public readonly stepGoal = computed(() => {
     return this.authService.userProfile()?.settings?.dailyStepGoal || 10000;
   });
@@ -51,12 +66,25 @@ export class DashboardComponent implements OnInit {
     return Math.min(100, Math.round((this.liveSteps() / this.stepGoal()) * 100));
   });
   public readonly estimatedDistanceKm = computed(() => {
-    const km = (this.liveSteps() * 0.762) / 1000;
+    const height = this.athleteDemographics().heightCm;
+    const gender = this.athleteDemographics().gender;
+    const strideMeters = this.physicsEngine.calculateStrideLengthMeters(height, gender);
+    const km = (this.liveSteps() * strideMeters) / 1000;
     return (Math.round(km * 100) / 100).toFixed(2);
   });
   public readonly estimatedActiveCalories = computed(() => {
-    return Math.round(this.liveSteps() * 0.04);
+    const weight = this.athleteDemographics().weightKg;
+    return this.physicsEngine.calculateStepCalories(this.liveSteps(), weight);
   });
+
+  // Profile Settings Modal State
+  public readonly showProfileModal = signal<boolean>(false);
+  public readonly editGender = signal<'male' | 'female' | 'other'>('male');
+  public readonly editAge = signal<number>(26);
+  public readonly editWeightKg = signal<number>(75);
+  public readonly editHeightCm = signal<number>(180);
+  public readonly editStepGoal = signal<number>(10000);
+  public readonly isProfileSaving = signal<boolean>(false);
 
   public readonly recoveryColor = computed(() => {
     const score = this.recoveryScore();
@@ -327,5 +355,42 @@ export class DashboardComponent implements OnInit {
 
   public toggleAlgorithmInspector(): void {
     this.showAlgorithmInspector.set(!this.showAlgorithmInspector());
+  }
+
+  // Athlete Profile Modal Methods
+  public openProfileModal(): void {
+    const demo = this.athleteDemographics();
+    this.editGender.set(demo.gender);
+    this.editAge.set(demo.age);
+    this.editWeightKg.set(demo.weightKg);
+    this.editHeightCm.set(demo.heightCm);
+    this.editStepGoal.set(this.stepGoal());
+    this.showProfileModal.set(true);
+  }
+
+  public closeProfileModal(): void {
+    this.showProfileModal.set(false);
+  }
+
+  public async saveProfileSettings(): Promise<void> {
+    this.isProfileSaving.set(true);
+    try {
+      const uid = this.activeUserId();
+      await this.authService.updateDemographics(
+        uid,
+        {
+          gender: this.editGender(),
+          age: Number(this.editAge()),
+          weightKg: Number(this.editWeightKg()),
+          heightCm: Number(this.editHeightCm()),
+        },
+        {
+          dailyStepGoal: Number(this.editStepGoal()),
+        }
+      );
+      this.closeProfileModal();
+    } finally {
+      this.isProfileSaving.set(false);
+    }
   }
 }

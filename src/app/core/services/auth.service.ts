@@ -10,7 +10,7 @@ import {
   User,
 } from '@angular/fire/auth';
 import { Firestore, doc, getDoc, setDoc } from '@angular/fire/firestore';
-import { UserProfileDocument, UserPhysiologyBaseline } from '../models/biometrics.interface';
+import { UserProfileDocument, UserPhysiologyBaseline, UserDemographics } from '../models/biometrics.interface';
 
 @Injectable({
   providedIn: 'root',
@@ -125,31 +125,51 @@ export class AuthService {
           lastLoginAt: new Date().toISOString(),
         };
       } else {
-        profileData = {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || 'Vagus Athlete',
-          photoURL: user.photoURL,
-          createdAt: new Date().toISOString(),
-          lastLoginAt: new Date().toISOString(),
-          baseline: { ...this.defaultBaseline },
-          settings: {
-            dailyStepGoal: 10000,
-            metricUnits: true,
-          },
-        };
+        // Check local storage backup before defaulting
+        const cached = typeof localStorage !== 'undefined' ? localStorage.getItem(`vagus_user_profile_${user.uid}`) : null;
+        if (cached) {
+          profileData = JSON.parse(cached);
+          profileData.lastLoginAt = new Date().toISOString();
+        } else {
+          profileData = {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName || 'Vagus Athlete',
+            photoURL: user.photoURL,
+            createdAt: new Date().toISOString(),
+            lastLoginAt: new Date().toISOString(),
+            demographics: {
+              gender: 'male',
+              age: 26,
+              weightKg: 75,
+              heightCm: 180,
+            },
+            baseline: { ...this.defaultBaseline },
+            settings: {
+              dailyStepGoal: 10000,
+              metricUnits: true,
+            },
+          };
+        }
       }
 
       await setDoc(userDocRef, profileData, { merge: true });
     } catch (err) {
       console.warn('[AuthService] Firestore user doc write error:', err);
-      profileData = {
+      const cached = typeof localStorage !== 'undefined' ? localStorage.getItem(`vagus_user_profile_${user.uid}`) : null;
+      profileData = cached ? JSON.parse(cached) : {
         uid: user.uid,
         email: user.email,
         displayName: user.displayName || 'Vagus Athlete',
         photoURL: user.photoURL,
         createdAt: new Date().toISOString(),
         lastLoginAt: new Date().toISOString(),
+        demographics: {
+          gender: 'male',
+          age: 26,
+          weightKg: 75,
+          heightCm: 180,
+        },
         baseline: { ...this.defaultBaseline },
         settings: {
           dailyStepGoal: 10000,
@@ -158,8 +178,61 @@ export class AuthService {
       };
     }
 
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(`vagus_user_profile_${user.uid}`, JSON.stringify(profileData));
+    }
     this.userProfile.set(profileData);
     return profileData;
+  }
+
+  /**
+   * Update User Demographics (Gender, Age, Weight, Height) and recalibrate Max HR
+   */
+  public async updateDemographics(
+    uid: string,
+    demographics: UserDemographics,
+    settings?: { dailyStepGoal?: number; metricUnits?: boolean }
+  ): Promise<UserProfileDocument | null> {
+    const current = this.userProfile();
+    const safeAge = Math.max(12, Math.min(100, demographics.age));
+    const calibratedMaxHR = Math.round(208 - (0.7 * safeAge));
+
+    const updatedProfile: UserProfileDocument = {
+      ...(current || {
+        uid,
+        email: this.currentUser()?.email || null,
+        displayName: this.currentUser()?.displayName || 'Vagus Athlete',
+        photoURL: this.currentUser()?.photoURL || null,
+        createdAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+      }),
+      demographics,
+      baseline: {
+        ...(current?.baseline || this.defaultBaseline),
+        maxHR: calibratedMaxHR,
+      },
+      settings: {
+        dailyStepGoal: settings?.dailyStepGoal ?? current?.settings?.dailyStepGoal ?? 10000,
+        metricUnits: settings?.metricUnits ?? current?.settings?.metricUnits ?? true,
+      },
+    };
+
+    this.userProfile.set(updatedProfile);
+
+    // Save to localStorage
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(`vagus_user_profile_${uid}`, JSON.stringify(updatedProfile));
+    }
+
+    // Save to Firestore
+    try {
+      const userDocRef = doc(this.firestore, `users/${uid}`);
+      await setDoc(userDocRef, updatedProfile, { merge: true });
+    } catch (err) {
+      console.warn('[AuthService] Firestore profile update error:', err);
+    }
+
+    return updatedProfile;
   }
 
   /**

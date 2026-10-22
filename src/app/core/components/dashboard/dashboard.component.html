@@ -83,15 +83,15 @@
     <ng-template #loggedOutState>
       <div class="flex items-center justify-between">
         <div class="leading-tight">
-          <div class="text-xs font-mono text-slate-300 font-medium">GUEST SESSION</div>
-          <div class="text-[10px] font-mono text-slate-500">Sign in to maintain your user document</div>
+          <div class="text-xs font-mono text-slate-300 font-medium">GUEST ATHLETE SESSION</div>
+          <div class="text-[10px] font-mono text-slate-500">Sign in to sync your cloud physiology document</div>
         </div>
 
         <button
           type="button"
           (click)="loginGoogle()"
           [disabled]="authService.isLoading()"
-          class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white text-slate-900 hover:bg-slate-100 font-mono text-xs font-semibold shadow transition-all disabled:opacity-50"
+          class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white text-slate-900 hover:bg-slate-100 font-mono text-xs font-semibold shadow transition-all disabled:opacity-50 cursor-pointer"
         >
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/>
@@ -113,6 +113,30 @@
         </button>
       </div>
     </ng-template>
+
+    <!-- Athlete Demographics Quick Bar (Calibrated Stats) -->
+    <div class="mt-2.5 pt-2.5 border-t border-slate-800/70 flex items-center justify-between text-[10px] font-mono">
+      <div class="text-slate-400 flex items-center gap-1.5 flex-wrap">
+        <span class="text-cyan-400 font-bold uppercase">{{ athleteDemographics().gender }}</span>
+        <span>•</span>
+        <span>{{ athleteDemographics().age }}y</span>
+        <span>•</span>
+        <span>{{ athleteDemographics().weightKg }}kg</span>
+        <span>•</span>
+        <span>{{ athleteDemographics().heightCm }}cm</span>
+        <span>•</span>
+        <span class="text-rose-400 font-bold">MaxHR: {{ calibratedMaxHR() }} bpm</span>
+      </div>
+
+      <button
+        type="button"
+        (click)="openProfileModal()"
+        class="shrink-0 ml-2 px-2 py-0.5 rounded bg-cyan-950/60 hover:bg-cyan-900/60 border border-cyan-800/60 text-cyan-300 font-bold transition-colors cursor-pointer"
+        title="Edit Age, Gender, Weight, Height to recalibrate MaxHR and TRIMP"
+      >
+        ⚙️ EDIT STATS
+      </button>
+    </div>
   </section>
 
   <!-- Main Scrollable Diagnostics Viewport -->
@@ -1094,6 +1118,156 @@
       >
         CLOSE INSPECTOR
       </button>
+    </div>
+  </div>
+
+  <!-- MODAL 3: ATHLETE PHYSIOLOGY PROFILE (AGE, GENDER, WEIGHT, HEIGHT) -->
+  <div
+    *ngIf="showProfileModal()"
+    class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+  >
+    <div class="max-w-md w-full p-6 rounded-3xl bg-slate-900 border border-cyan-500/40 shadow-2xl flex flex-col space-y-4 font-mono text-xs relative max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+          <span class="text-sm font-bold text-white uppercase">ATHLETE PHYSIOLOGY STATS</span>
+        </div>
+        <button
+          type="button"
+          (click)="closeProfileModal()"
+          class="text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 cursor-pointer"
+        >
+          ✕
+        </button>
+      </div>
+
+      <p class="text-[11px] text-slate-400 font-sans leading-relaxed">
+        Your physiological stats directly calibrate <strong class="text-slate-200">Max Heart Rate</strong>, <strong class="text-slate-200">Banister TRIMP Strain curves</strong>, <strong class="text-slate-200">biomechanical stride</strong>, and <strong class="text-slate-200">active caloric burn</strong>.
+      </p>
+
+      <form (submit)="$event.preventDefault(); saveProfileSettings()" class="space-y-4 pt-1">
+        
+        <!-- Field 1: Gender -->
+        <div class="space-y-1.5">
+          <label class="text-[10px] uppercase text-slate-400 font-bold">Biological Sex / Gender (Banister Curve Factor)</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              (click)="editGender.set('male')"
+              class="py-2 rounded-xl border text-center transition-all cursor-pointer font-bold"
+              [ngClass]="editGender() === 'male' ? 'bg-cyan-600 text-slate-950 border-cyan-400' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'"
+            >
+              MALE
+            </button>
+            <button
+              type="button"
+              (click)="editGender.set('female')"
+              class="py-2 rounded-xl border text-center transition-all cursor-pointer font-bold"
+              [ngClass]="editGender() === 'female' ? 'bg-cyan-600 text-slate-950 border-cyan-400' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'"
+            >
+              FEMALE
+            </button>
+            <button
+              type="button"
+              (click)="editGender.set('other')"
+              class="py-2 rounded-xl border text-center transition-all cursor-pointer font-bold"
+              [ngClass]="editGender() === 'other' ? 'bg-cyan-600 text-slate-950 border-cyan-400' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'"
+            >
+              OTHER
+            </button>
+          </div>
+        </div>
+
+        <!-- Field 2: Age -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="text-[10px] uppercase text-slate-400 font-bold">Age (Years)</label>
+            <span class="text-cyan-400 font-bold">{{ editAge() }} yrs &rarr; MaxHR: {{ 208 - Math.round(0.7 * editAge()) }} bpm</span>
+          </div>
+          <input
+            type="number"
+            min="12"
+            max="100"
+            [value]="editAge()"
+            (input)="editAge.set(+$any($event.target).value)"
+            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:border-cyan-400 focus:outline-none"
+          />
+          <div class="text-[9px] text-slate-500 font-sans">
+            Calibrates physiological ceiling via Tanaka Formula: <span class="font-mono text-cyan-300">208 - (0.7 &times; Age)</span>
+          </div>
+        </div>
+
+        <!-- Field 3: Weight -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="text-[10px] uppercase text-slate-400 font-bold">Body Weight (kg)</label>
+            <span class="text-cyan-400 font-bold">{{ editWeightKg() }} kg ({{ Math.round(editWeightKg() * 2.20462) }} lbs)</span>
+          </div>
+          <input
+            type="number"
+            min="35"
+            max="250"
+            [value]="editWeightKg()"
+            (input)="editWeightKg.set(+$any($event.target).value)"
+            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:border-cyan-400 focus:outline-none"
+          />
+          <div class="text-[9px] text-slate-500 font-sans">
+            Calibrates active caloric burn and Basal Metabolic Rate (BMR).
+          </div>
+        </div>
+
+        <!-- Field 4: Height -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="text-[10px] uppercase text-slate-400 font-bold">Height (cm)</label>
+            <span class="text-cyan-400 font-bold">{{ editHeightCm() }} cm &rarr; Stride: {{ (editHeightCm() * 0.415 / 100).toFixed(2) }} m</span>
+          </div>
+          <input
+            type="number"
+            min="120"
+            max="230"
+            [value]="editHeightCm()"
+            (input)="editHeightCm.set(+$any($event.target).value)"
+            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:border-cyan-400 focus:outline-none"
+          />
+          <div class="text-[9px] text-slate-500 font-sans">
+            Calculates exact biomechanical stride length for walking and volleyball movements.
+          </div>
+        </div>
+
+        <!-- Field 5: Daily Step Goal -->
+        <div class="space-y-1.5">
+          <label class="text-[10px] uppercase text-slate-400 font-bold">Daily Step Target</label>
+          <input
+            type="number"
+            min="1000"
+            max="50000"
+            step="500"
+            [value]="editStepGoal()"
+            (input)="editStepGoal.set(+$any($event.target).value)"
+            class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono focus:border-cyan-400 focus:outline-none"
+          />
+        </div>
+
+        <!-- Buttons -->
+        <div class="flex gap-2 pt-2">
+          <button
+            type="button"
+            (click)="saveProfileSettings()"
+            [disabled]="isProfileSaving()"
+            class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-bold uppercase tracking-wider text-xs transition-all shadow-md cursor-pointer disabled:opacity-50"
+          >
+            {{ isProfileSaving() ? 'SAVING...' : 'SAVE PHYSIOLOGICAL PROFILE' }}
+          </button>
+          <button
+            type="button"
+            (click)="closeProfileModal()"
+            class="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold uppercase tracking-wider text-xs transition-colors cursor-pointer"
+          >
+            CANCEL
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 </div>

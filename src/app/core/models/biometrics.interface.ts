@@ -55,12 +55,22 @@ export interface RollingDayMetric {
 }
 
 /**
+ * User Demographics for Personalized Physiological Calibration
+ */
+export interface UserDemographics {
+  gender: 'male' | 'female' | 'other';
+  age: number;        // in years (e.g. 26)
+  weightKg: number;   // in kilograms (e.g. 75)
+  heightCm: number;   // in centimeters (e.g. 180)
+}
+
+/**
  * User Biometric Baseline Profile
  */
 export interface UserPhysiologyBaseline {
   baselineRMSSD: number;       // Rolling 30-day baseline RMSSD (default e.g. 55ms)
   baselineRHR: number;         // Rolling 30-day baseline resting HR (default e.g. 52bpm)
-  maxHR: number;               // Physiological max heart rate (default 220 - age or laboratory test)
+  maxHR: number;               // Physiological max heart rate (Tanaka formula or laboratory test)
 }
 
 /**
@@ -92,6 +102,7 @@ export interface UserProfileDocument {
   photoURL: string | null;
   createdAt: string;
   lastLoginAt: string;
+  demographics?: UserDemographics;
   baseline: UserPhysiologyBaseline;
   settings?: {
     dailyStepGoal: number;
