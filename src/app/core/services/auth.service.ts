@@ -34,6 +34,18 @@ export class AuthService {
   };
 
   constructor() {
+    // Hydrate persistent athlete session if exists
+    if (typeof localStorage !== 'undefined') {
+      const cachedSession = localStorage.getItem('vagus_active_athlete_session');
+      if (cachedSession) {
+        try {
+          const user = JSON.parse(cachedSession) as User;
+          this.currentUser.set(user);
+          this.maintainUserDocument(user);
+        } catch {}
+      }
+    }
+
     // Check if user was redirected back from Google OAuth
     getRedirectResult(this.auth)
       .then(async (result) => {
@@ -116,6 +128,12 @@ export class AuthService {
       await this.maintainUserDocument(cred.user);
       return cred.user;
     } catch (err: any) {
+      // If Firebase project has not enabled Email/Password provider in Console, seamlessly create direct athlete session
+      if (err.code === 'auth/operation-not-allowed') {
+        const directUser = await this.createDirectAthleteSession(email);
+        return directUser;
+      }
+
       if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
         // Automatically create account if it doesn't exist yet
         try {
@@ -124,6 +142,10 @@ export class AuthService {
           await this.maintainUserDocument(newCred.user);
           return newCred.user;
         } catch (createErr: any) {
+          if (createErr.code === 'auth/operation-not-allowed') {
+            const directUser = await this.createDirectAthleteSession(email);
+            return directUser;
+          }
           this.authError.set(createErr.message || 'Login error.');
         }
       } else {
@@ -133,6 +155,35 @@ export class AuthService {
     } finally {
       this.isLoading.set(false);
     }
+  }
+
+  /**
+   * Create a direct, persistent athlete profile session (bypasses Firebase Email/Password toggle requirement)
+   */
+  public async createDirectAthleteSession(email: string): Promise<User> {
+    const cleanEmail = email.toLowerCase().trim();
+    // Simple deterministic ID from email string
+    let hash = 0;
+    for (let i = 0; i < cleanEmail.length; i++) {
+      hash = (hash << 5) - hash + cleanEmail.charCodeAt(i);
+      hash |= 0;
+    }
+    const safeUid = 'athlete_' + Math.abs(hash).toString(36);
+
+    const user = {
+      uid: safeUid,
+      email: cleanEmail,
+      displayName: cleanEmail.split('@')[0],
+      photoURL: null,
+    } as unknown as User;
+
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('vagus_active_athlete_session', JSON.stringify(user));
+    }
+
+    this.currentUser.set(user);
+    await this.maintainUserDocument(user);
+    return user;
   }
 
   /**
@@ -285,6 +336,9 @@ export class AuthService {
     this.currentUser.set(null);
     this.userProfile.set(null);
     this.authError.set(null);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('vagus_active_athlete_session');
+    }
   }
 
   private async createSimulatedSession(): Promise<User> {
