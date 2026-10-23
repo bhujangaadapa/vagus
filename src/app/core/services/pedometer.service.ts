@@ -40,8 +40,15 @@ export class PedometerService {
 
   // Active user / date context
   private currentUserId = '';
-  private currentDateStr = new Date().toISOString().slice(0, 10);
+  private currentDateStr = this.getLocalDateStr();
   private readonly storageKey = 'vagus_step_counter_state';
+
+  private getLocalDateStr(d: Date = new Date()): string {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
 
   constructor() {
     this.detectOperatingSystem();
@@ -550,26 +557,54 @@ export class PedometerService {
     } catch {}
   }
 
-  private restorePersistedStepCount(): void {
-    if (typeof localStorage === 'undefined') return;
+  public getStoredStepsForToday(): number {
+    if (typeof localStorage === 'undefined') return 0;
     try {
       const raw = localStorage.getItem(this.storageKey);
       if (raw) {
         const data = JSON.parse(raw);
+        const todayStr = this.getLocalDateStr();
+        if (data && (data.date === todayStr || data.date === this.currentDateStr) && typeof data.steps === 'number') {
+          return data.steps;
+        }
+      }
+    } catch {}
+    return 0;
+  }
+
+  private restorePersistedStepCount(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      this.currentDateStr = this.getLocalDateStr();
+      const raw = localStorage.getItem(this.storageKey);
+      if (raw) {
+        const data = JSON.parse(raw);
         if (data.date === this.currentDateStr && typeof data.steps === 'number') {
-          this.currentSteps.set(data.steps);
+          if (data.steps > this.currentSteps()) {
+            this.currentSteps.set(data.steps);
+          }
           const bridge = typeof window !== 'undefined' ? (window as any).AndroidHardwarePedometer : null;
           if (bridge && typeof bridge.setInitialBaseline === 'function') {
             bridge.setInitialBaseline(data.steps);
           }
-        } else if (data.date !== this.currentDateStr) {
-          // Midnight has passed: automatically start today's fresh counter at 0
-          this.currentSteps.set(0);
-          this.activeCadence.set(0);
-          this.persistStepCount(0);
         }
       }
     } catch {}
+  }
+
+  /**
+   * Golden step reconciliation rule:
+   * Math.max(stepUpSteps, healthConnectSteps, firebaseSteps, fitbitSteps, localCachedSteps)
+   */
+  public reconcileSteps(firebaseSteps: number = 0, fitbitSteps: number = 0): number {
+    const current = this.currentSteps();
+    const stored = this.getStoredStepsForToday();
+    const highest = Math.max(current, stored, firebaseSteps, fitbitSteps);
+    if (highest > current) {
+      this.currentSteps.set(highest);
+      this.persistStepCount(highest);
+    }
+    return highest;
   }
 
   /**

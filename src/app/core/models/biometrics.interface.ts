@@ -12,6 +12,9 @@ export interface DailyBiometrics {
   remSleepMinutes: number;     // Rapid Eye Movement sleep in minutes
   avgSleepHR: number;          // Average heart rate during nocturnal sleep in bpm
   steps: number;               // Accumulated daily footsteps from Android device sensor
+  respiratoryRate?: number;    // Breaths per minute (e.g. 14.8 rpm)
+  bloodOxygenSpO2?: number;    // SpO2 percentage (e.g. 98%)
+  skinTempVarianceCelsius?: number; // Variance in °C from baseline (e.g. -0.1°C)
 }
 
 export interface JournalHabits {

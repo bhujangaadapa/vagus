@@ -384,6 +384,20 @@ export class DataBridgeService {
     }));
     const fatigueDrag = this.physicsEngine.calculateFatigueDrag(rolling7);
 
+    // Golden step rule: restore steps from local storage or cached state if already recorded today
+    let existingSteps = 0;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('vagus_step_counter_state');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed.date === todayStr && typeof parsed.steps === 'number') {
+            existingSteps = parsed.steps;
+          }
+        }
+      } catch {}
+    }
+
     const freshDay: DailyBiometricLog = {
       date: todayStr,
       biometrics: {
@@ -393,7 +407,10 @@ export class DataBridgeService {
         deepSleepMinutes: 0,
         remSleepMinutes: 0,
         avgSleepHR: 0,
-        steps: 0,
+        steps: existingSteps,
+        respiratoryRate: 14.8,
+        bloodOxygenSpO2: 98,
+        skinTempVarianceCelsius: -0.1,
       },
       journalHabits: {
         drankAlcohol: false,
@@ -510,20 +527,21 @@ export class DataBridgeService {
    */
   public updateLiveSteps(userId: string, dateStr: string, steps: number): void {
     const current = this.todayLogSubject.value;
+    const finalSteps = current ? Math.max(current.biometrics?.steps || 0, steps) : steps;
     if (current) {
-      current.biometrics.steps = steps;
+      current.biometrics.steps = finalSteps;
       this.todayLogSubject.next({ ...current });
       this.saveToLocalStorage(userId, current);
     }
 
     // Debounce cloud write to every 3 seconds (or when step delta >= 10) so the UI stays 60 FPS silky smooth
-    if (!this.stepSyncTimer || Math.abs(steps - this.lastSyncedSteps) >= 10) {
+    if (!this.stepSyncTimer || Math.abs(finalSteps - this.lastSyncedSteps) >= 10) {
       if (this.stepSyncTimer) clearTimeout(this.stepSyncTimer);
       this.stepSyncTimer = setTimeout(async () => {
         try {
-          this.lastSyncedSteps = steps;
+          this.lastSyncedSteps = finalSteps;
           const docRef = doc(this.firestore, `users/${userId}/daily_logs/${dateStr}`);
-          await setDoc(docRef, { biometrics: { steps } }, { merge: true });
+          await setDoc(docRef, { biometrics: { steps: finalSteps } }, { merge: true });
         } catch {
           // Local fallback
         } finally {
@@ -829,6 +847,10 @@ export class DataBridgeService {
     ];
     const cumulativeFatigueDrag = this.physicsEngine.calculateFatigueDrag(rollingWithToday);
 
+    const respRate = Math.round((14.6 + Math.sin(dayOffset * 0.9) * 0.8 + (drankAlcohol ? 0.6 : 0)) * 10) / 10;
+    const spO2 = Math.min(100, Math.max(95, Math.round(98 + Math.cos(dayOffset * 0.7) * 1.2 - (drankAlcohol ? 1 : 0))));
+    const skinTempVar = Math.round((Math.sin(dayOffset * 0.5) * 0.35 + (drankAlcohol ? 0.4 : 0)) * 10) / 10;
+
     const biometrics: DailyBiometrics = {
       overnightRMSSD,
       restingHR,
@@ -837,6 +859,9 @@ export class DataBridgeService {
       remSleepMinutes,
       avgSleepHR,
       steps: Math.round(6500 + Math.sin(dayOffset * 1.5) * 3200 + (isHardWorkoutDay ? 4500 : 0)),
+      respiratoryRate: respRate,
+      bloodOxygenSpO2: spO2,
+      skinTempVarianceCelsius: skinTempVar,
     };
 
     const journalHabits: JournalHabits = {

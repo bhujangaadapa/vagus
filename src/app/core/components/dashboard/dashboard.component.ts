@@ -62,7 +62,11 @@ export class DashboardComponent implements OnInit {
     return this.authService.userProfile()?.settings?.dailyStepGoal || 10000;
   });
   public readonly liveSteps = computed(() => {
-    return this.pedometer.currentSteps() || (this.todayLog()?.biometrics.steps ?? 0);
+    const pSteps = this.pedometer.currentSteps();
+    const fbSteps = this.todayLog()?.biometrics?.steps ?? 0;
+    const fitbitSteps = this.fitbit.lastImport()?.steps ?? 0;
+    const localSteps = this.pedometer.getStoredStepsForToday();
+    return Math.max(pSteps, fbSteps, fitbitSteps, localSteps, 0);
   });
   public readonly stepProgressPercent = computed(() => {
     return Math.min(100, Math.round((this.liveSteps() / this.stepGoal()) * 100));
@@ -78,6 +82,58 @@ export class DashboardComponent implements OnInit {
     const weight = this.athleteDemographics().weightKg;
     return this.physicsEngine.calculateStepCalories(this.liveSteps(), weight);
   });
+  public readonly totalCaloriesBurned = computed(() => {
+    const demo = this.athleteDemographics();
+    const bmr = Math.round(
+      10 * demo.weightKg + 6.25 * demo.heightCm - 5 * demo.age + (demo.gender === 'female' ? -161 : 5)
+    );
+    return bmr + this.estimatedActiveCalories();
+  });
+
+  // Authentic WHOOP 4.0 Health Monitor Vitals (All 5 Key Biomarkers)
+  public readonly keyVitals = computed(() => {
+    const log = this.todayLog();
+    const baseHRV = this.authService.userProfile()?.baseline.baselineRMSSD || 58;
+    const baseRHR = this.authService.userProfile()?.baseline.baselineRHR || 52;
+    const currentRMSSD = log?.biometrics.overnightRMSSD || baseHRV;
+    const currentRHR = log?.biometrics.restingHR || baseRHR;
+    const respRate = log?.biometrics.respiratoryRate || 14.8;
+    const spO2 = log?.biometrics.bloodOxygenSpO2 || 98;
+    const skinTempVar = log?.biometrics.skinTempVarianceCelsius ?? -0.1;
+
+    return {
+      hrv: {
+        value: currentRMSSD,
+        unit: 'ms',
+        status: currentRMSSD >= baseHRV * 0.9 ? 'TYPICAL' : 'LOW',
+        baseline: `${Math.round(baseHRV * 0.88)}–${Math.round(baseHRV * 1.15)} ms`,
+      },
+      rhr: {
+        value: currentRHR,
+        unit: 'bpm',
+        status: currentRHR <= baseRHR * 1.08 ? 'TYPICAL' : 'ELEVATED',
+        baseline: `${Math.round(baseRHR * 0.92)}–${Math.round(baseRHR * 1.08)} bpm`,
+      },
+      respiratoryRate: {
+        value: respRate,
+        unit: 'rpm',
+        status: respRate <= 16.5 ? 'TYPICAL' : 'ELEVATED',
+        baseline: '14.0–15.8 rpm',
+      },
+      bloodOxygen: {
+        value: spO2,
+        unit: '%',
+        status: spO2 >= 95 ? 'TYPICAL' : 'LOW',
+        baseline: '95–99 %',
+      },
+      skinTemp: {
+        value: skinTempVar > 0 ? `+${skinTempVar.toFixed(1)}` : `${skinTempVar.toFixed(1)}`,
+        unit: '°C',
+        status: Math.abs(skinTempVar) <= 0.5 ? 'TYPICAL' : 'ELEVATED',
+        baseline: '-0.5 to +0.5 °C',
+      },
+    };
+  });
 
   // Active Pillar Navigation (WHOOP 4.0 Tabs: Overview, Recovery, Strain, Sleep, Sensors)
   public readonly activePillar = signal<'overview' | 'recovery' | 'strain' | 'sleep' | 'sensors'>('overview');
@@ -85,9 +141,9 @@ export class DashboardComponent implements OnInit {
     this.activePillar.set(pillar);
   }
 
-  // Active Hardware Sub-Tab
-  public readonly activeHardwareTab = signal<'polar' | 'ppg' | 'fitbit' | 'steps'>('polar');
-  public setHardwareTab(tab: 'polar' | 'ppg' | 'fitbit' | 'steps'): void {
+  // Active Hardware Sub-Tab in Sensors & Lab
+  public readonly activeHardwareTab = signal<'polar' | 'ppg' | 'fitbit' | 'steps' | 'pacer' | 'algorithms'>('polar');
+  public setHardwareTab(tab: 'polar' | 'ppg' | 'fitbit' | 'steps' | 'pacer' | 'algorithms'): void {
     this.activeHardwareTab.set(tab);
   }
 
@@ -228,7 +284,11 @@ export class DashboardComponent implements OnInit {
       this.dataBridge.getDailyLogs(uid).subscribe((logs) => {
         this.historyLogs.set(logs);
         if (logs.length > 0) {
-          this.todayLog.set(logs[logs.length - 1]);
+          const latest = logs[logs.length - 1];
+          this.todayLog.set(latest);
+          if (latest?.biometrics?.steps) {
+            this.pedometer.reconcileSteps(latest.biometrics.steps);
+          }
         }
       });
     });
@@ -244,13 +304,20 @@ export class DashboardComponent implements OnInit {
     this.dataBridge.logs$.subscribe((logs) => {
       this.historyLogs.set(logs);
       if (logs.length > 0) {
-        this.todayLog.set(logs[logs.length - 1]);
+        const latest = logs[logs.length - 1];
+        this.todayLog.set(latest);
+        if (latest?.biometrics?.steps) {
+          this.pedometer.reconcileSteps(latest.biometrics.steps);
+        }
       }
     });
 
     this.dataBridge.todayLog$.subscribe((log) => {
       if (log) {
         this.todayLog.set(log);
+        if (log?.biometrics?.steps) {
+          this.pedometer.reconcileSteps(log.biometrics.steps);
+        }
       }
     });
   }

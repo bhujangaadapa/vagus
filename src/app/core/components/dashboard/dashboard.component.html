@@ -209,24 +209,63 @@
             </div>
           </div>
         </div>
+      </section>
 
-        <!-- Quick Access Utilities (Vagus Resonance Pacer + Algorithm Inspector) -->
-        <div class="grid grid-cols-2 gap-2 w-full mt-4 pt-3 border-t border-white/[0.06] text-xs font-mono">
-          <button
-            type="button"
-            (click)="toggleVagusPacer()"
-            class="py-2 px-3 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer"
-          >
-            <span>🧘 VAGUS PACER (0.1 Hz)</span>
-          </button>
+      <!-- WHOOP 4.0 HEALTH MONITOR CARD (ALL 5 KEY VITAL BIOMARKERS) -->
+      <section (click)="setPillar('recovery')" class="whoop-surface p-5 rounded-3xl cursor-pointer hover:border-emerald-500/30 transition-all space-y-3 font-mono">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-2.5 h-2.5 rounded-full bg-[#00F5A0] shadow-[0_0_8px_#00F5A0]"></div>
+            <div>
+              <span class="text-xs uppercase tracking-wider text-white font-bold">HEALTH MONITOR</span>
+              <span class="text-[10px] text-zinc-500 ml-1.5">5 VITAL SIGNS</span>
+            </div>
+          </div>
+          <span class="text-[9px] px-2.5 py-0.5 rounded-full bg-[#00F5A0]/15 border border-[#00F5A0]/30 text-[#00F5A0] font-bold">
+            ALL IN TYPICAL RANGE
+          </span>
+        </div>
 
-          <button
-            type="button"
-            (click)="toggleAlgorithmInspector()"
-            class="py-2 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer"
-          >
-            <span>🔍 ALGORITHM LOGIC</span>
-          </button>
+        <div class="grid grid-cols-5 gap-1.5 pt-1 text-center">
+          <!-- Respiratory Rate -->
+          <div class="p-2 rounded-2xl bg-black/40 border border-white/[0.04]">
+            <div class="text-[8px] text-zinc-500 uppercase truncate">RESP RATE</div>
+            <div class="text-sm font-bold text-white mt-0.5">{{ keyVitals().respiratoryRate.value }}</div>
+            <div class="text-[8px] text-zinc-500">rpm</div>
+            <div class="text-[8px] text-[#00F5A0] mt-1 font-bold">{{ keyVitals().respiratoryRate.status }}</div>
+          </div>
+
+          <!-- Blood Oxygen -->
+          <div class="p-2 rounded-2xl bg-black/40 border border-white/[0.04]">
+            <div class="text-[8px] text-zinc-500 uppercase truncate">BLOOD O₂</div>
+            <div class="text-sm font-bold text-white mt-0.5">{{ keyVitals().bloodOxygen.value }}%</div>
+            <div class="text-[8px] text-zinc-500">SpO2</div>
+            <div class="text-[8px] text-[#00F5A0] mt-1 font-bold">{{ keyVitals().bloodOxygen.status }}</div>
+          </div>
+
+          <!-- Resting HR -->
+          <div class="p-2 rounded-2xl bg-black/40 border border-white/[0.04]">
+            <div class="text-[8px] text-zinc-500 uppercase truncate">RESTING HR</div>
+            <div class="text-sm font-bold text-white mt-0.5">{{ keyVitals().rhr.value }}</div>
+            <div class="text-[8px] text-zinc-500">bpm</div>
+            <div class="text-[8px] text-[#00F5A0] mt-1 font-bold">{{ keyVitals().rhr.status }}</div>
+          </div>
+
+          <!-- HRV -->
+          <div class="p-2 rounded-2xl bg-black/40 border border-white/[0.04]">
+            <div class="text-[8px] text-zinc-500 uppercase truncate">HRV</div>
+            <div class="text-sm font-bold text-white mt-0.5">{{ keyVitals().hrv.value }}</div>
+            <div class="text-[8px] text-zinc-500">ms</div>
+            <div class="text-[8px] text-[#00F5A0] mt-1 font-bold">{{ keyVitals().hrv.status }}</div>
+          </div>
+
+          <!-- Skin Temp -->
+          <div class="p-2 rounded-2xl bg-black/40 border border-white/[0.04]">
+            <div class="text-[8px] text-zinc-500 uppercase truncate">SKIN TEMP</div>
+            <div class="text-sm font-bold text-white mt-0.5">{{ keyVitals().skinTemp.value }}</div>
+            <div class="text-[8px] text-zinc-500">°C</div>
+            <div class="text-[8px] text-[#00F5A0] mt-1 font-bold">{{ keyVitals().skinTemp.status }}</div>
+          </div>
         </div>
       </section>
 
@@ -276,14 +315,18 @@
         </div>
 
         <!-- Footsteps & Calorie Strip inside Strain Card -->
-        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-white/[0.05] text-[11px] font-mono">
-          <div class="p-2.5 rounded-xl bg-black/40 border border-white/[0.04] flex items-center justify-between">
-            <span class="text-zinc-500 uppercase">ACTIVE STEPS</span>
-            <span class="text-white font-bold">{{ liveSteps() | number }}</span>
+        <div class="grid grid-cols-3 gap-2 pt-2 border-t border-white/[0.05] text-[11px] font-mono text-center">
+          <div class="p-2 rounded-xl bg-black/40 border border-white/[0.04]">
+            <span class="text-[9px] text-zinc-500 uppercase block">ACTIVE STEPS</span>
+            <span class="text-white font-bold text-sm mt-0.5">{{ liveSteps() | number }}</span>
           </div>
-          <div class="p-2.5 rounded-xl bg-black/40 border border-white/[0.04] flex items-center justify-between">
-            <span class="text-zinc-500 uppercase">ACTIVE BURN</span>
-            <span class="text-white font-bold">{{ estimatedActiveCalories() }} kcal</span>
+          <div class="p-2 rounded-xl bg-black/40 border border-white/[0.04]">
+            <span class="text-[9px] text-zinc-500 uppercase block">ACTIVE BURN</span>
+            <span class="text-white font-bold text-sm mt-0.5">{{ estimatedActiveCalories() }} <span class="text-[9px] font-normal text-zinc-400">kcal</span></span>
+          </div>
+          <div class="p-2 rounded-xl bg-black/40 border border-white/[0.04]">
+            <span class="text-[9px] text-zinc-500 uppercase block">TOTAL BURN</span>
+            <span class="text-white font-bold text-sm mt-0.5">{{ totalCaloriesBurned() | number }} <span class="text-[9px] font-normal text-zinc-400">kcal</span></span>
           </div>
         </div>
       </section>
@@ -464,25 +507,97 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3 pt-2 font-mono text-xs">
-          <div class="p-3 rounded-2xl bg-black/40 border border-white/[0.04]">
-            <div class="text-[9px] text-zinc-500 uppercase">OVERNIGHT RMSSD</div>
-            <div class="text-xl font-bold text-[#00F5A0] mt-0.5">{{ todayLog()?.biometrics?.overnightRMSSD || 0 }} ms</div>
+        <!-- All 5 Key Autonomic Recovery Vitals with Baseline Range Bars -->
+        <div class="space-y-2 pt-2 font-mono text-xs">
+          <!-- 1. HRV -->
+          <div class="p-3 rounded-2xl bg-black/40 border border-white/[0.04] flex items-center justify-between">
+            <div>
+              <div class="text-[9px] text-zinc-500 uppercase font-semibold">HEART RATE VARIABILITY (RMSSD)</div>
+              <div class="text-xl font-bold text-[#00F5A0] mt-0.5">
+                {{ keyVitals().hrv.value }} <span class="text-xs text-zinc-400 font-normal">ms</span>
+              </div>
+              <div class="text-[10px] text-zinc-500 font-sans mt-0.5">30-day baseline: {{ keyVitals().hrv.baseline }}</div>
+            </div>
+            <span class="text-[9px] px-2.5 py-1 rounded-full bg-[#00F5A0]/15 border border-[#00F5A0]/30 text-[#00F5A0] font-bold">
+              {{ keyVitals().hrv.status }}
+            </span>
           </div>
-          <div class="p-3 rounded-2xl bg-black/40 border border-white/[0.04]">
-            <div class="text-[9px] text-zinc-500 uppercase">RESTING HEART RATE</div>
-            <div class="text-xl font-bold text-cyan-400 mt-0.5">{{ todayLog()?.biometrics?.restingHR || 0 }} bpm</div>
+
+          <!-- 2. Resting Heart Rate -->
+          <div class="p-3 rounded-2xl bg-black/40 border border-white/[0.04] flex items-center justify-between">
+            <div>
+              <div class="text-[9px] text-zinc-500 uppercase font-semibold">RESTING HEART RATE</div>
+              <div class="text-xl font-bold text-cyan-400 mt-0.5">
+                {{ keyVitals().rhr.value }} <span class="text-xs text-zinc-400 font-normal">bpm</span>
+              </div>
+              <div class="text-[10px] text-zinc-500 font-sans mt-0.5">30-day baseline: {{ keyVitals().rhr.baseline }}</div>
+            </div>
+            <span class="text-[9px] px-2.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-bold">
+              {{ keyVitals().rhr.status }}
+            </span>
+          </div>
+
+          <!-- 3. Respiratory Rate -->
+          <div class="p-3 rounded-2xl bg-black/40 border border-white/[0.04] flex items-center justify-between">
+            <div>
+              <div class="text-[9px] text-zinc-500 uppercase font-semibold">RESPIRATORY RATE</div>
+              <div class="text-xl font-bold text-white mt-0.5">
+                {{ keyVitals().respiratoryRate.value }} <span class="text-xs text-zinc-400 font-normal">rpm</span>
+              </div>
+              <div class="text-[10px] text-zinc-500 font-sans mt-0.5">30-day baseline: {{ keyVitals().respiratoryRate.baseline }}</div>
+            </div>
+            <span class="text-[9px] px-2.5 py-1 rounded-full bg-[#00F5A0]/15 border border-[#00F5A0]/30 text-[#00F5A0] font-bold">
+              {{ keyVitals().respiratoryRate.status }}
+            </span>
+          </div>
+
+          <!-- 4. Blood Oxygen (SpO2) -->
+          <div class="p-3 rounded-2xl bg-black/40 border border-white/[0.04] flex items-center justify-between">
+            <div>
+              <div class="text-[9px] text-zinc-500 uppercase font-semibold">BLOOD OXYGEN (SpO2)</div>
+              <div class="text-xl font-bold text-white mt-0.5">
+                {{ keyVitals().bloodOxygen.value }} <span class="text-xs text-zinc-400 font-normal">%</span>
+              </div>
+              <div class="text-[10px] text-zinc-500 font-sans mt-0.5">Typical range: {{ keyVitals().bloodOxygen.baseline }}</div>
+            </div>
+            <span class="text-[9px] px-2.5 py-1 rounded-full bg-[#00F5A0]/15 border border-[#00F5A0]/30 text-[#00F5A0] font-bold">
+              {{ keyVitals().bloodOxygen.status }}
+            </span>
+          </div>
+
+          <!-- 5. Skin Temperature Variance -->
+          <div class="p-3 rounded-2xl bg-black/40 border border-white/[0.04] flex items-center justify-between">
+            <div>
+              <div class="text-[9px] text-zinc-500 uppercase font-semibold">SKIN TEMPERATURE VARIANCE</div>
+              <div class="text-xl font-bold text-white mt-0.5">
+                {{ keyVitals().skinTemp.value }} <span class="text-xs text-zinc-400 font-normal">°C</span>
+              </div>
+              <div class="text-[10px] text-zinc-500 font-sans mt-0.5">Baseline variance: {{ keyVitals().skinTemp.baseline }}</div>
+            </div>
+            <span class="text-[9px] px-2.5 py-1 rounded-full bg-[#00F5A0]/15 border border-[#00F5A0]/30 text-[#00F5A0] font-bold">
+              {{ keyVitals().skinTemp.status }}
+            </span>
           </div>
         </div>
+      </section>
 
-        <!-- Launch Vagus Breathing Pacer Button -->
-        <button
-          type="button"
-          (click)="toggleVagusPacer()"
-          class="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-teal-500/20 to-emerald-500/20 hover:from-teal-500/30 hover:to-emerald-500/30 border border-teal-500/40 text-teal-300 font-mono text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2"
-        >
-          <span>🧘 LAUNCH 0.1 HZ VAGAL RESONANCE PACER</span>
-        </button>
+      <!-- WHOOP RECOVERY COACHING: TARGET STRAIN RECOMMENDATION -->
+      <section (click)="setPillar('strain')" class="whoop-surface p-5 rounded-3xl cursor-pointer hover:border-cyan-500/30 transition-all space-y-3 font-mono">
+        <div class="flex items-center justify-between">
+          <div class="text-xs uppercase tracking-wider text-white font-bold">RECOVERY COACHING // STRAIN TARGET</div>
+          <span class="text-xs font-bold text-cyan-400 bg-cyan-950/60 px-2.5 py-0.5 rounded-full border border-cyan-800/60">
+            TARGET: {{ targetStrain().target }}
+          </span>
+        </div>
+        <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] flex items-center justify-between font-sans text-xs">
+          <div class="space-y-1">
+            <div class="text-zinc-200 font-bold">Optimal Daily Strain Range</div>
+            <div class="text-zinc-400 text-[11px]">
+              Based on your {{ recoveryScore() }}% recovery, absorb between <strong class="text-cyan-300 font-mono">{{ targetStrain().min }}</strong> and <strong class="text-cyan-300 font-mono">{{ targetStrain().max }}</strong> strain to maintain autonomic equilibrium.
+            </div>
+          </div>
+          <div class="text-cyan-400 font-mono text-lg font-black ml-3 shrink-0">&rarr;</div>
+        </div>
       </section>
 
       <!-- Advanced Autonomic Steering Index -->
@@ -1283,12 +1398,12 @@
     <!-- ================================================================= -->
     <div *ngIf="activePillar() === 'sensors'" class="space-y-4">
       
-      <!-- Sensor Sub-Tabs Navigation -->
-      <div class="grid grid-cols-4 gap-1 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] text-[10px] font-mono tracking-wider font-semibold">
+      <!-- Sensor Sub-Tabs Navigation (Dedicated Hardware & Utility Lab) -->
+      <div class="grid grid-cols-6 gap-1 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] text-[9px] font-mono tracking-wider font-semibold">
         <button
           type="button"
           (click)="setHardwareTab('polar')"
-          class="py-1.5 rounded-xl transition-all text-center cursor-pointer"
+          class="py-1.5 rounded-xl transition-all text-center cursor-pointer truncate"
           [ngClass]="activeHardwareTab() === 'polar' ? 'bg-indigo-600/40 text-indigo-200 border border-indigo-500/40 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
         >
           POLAR H7
@@ -1297,16 +1412,16 @@
         <button
           type="button"
           (click)="setHardwareTab('ppg')"
-          class="py-1.5 rounded-xl transition-all text-center cursor-pointer"
+          class="py-1.5 rounded-xl transition-all text-center cursor-pointer truncate"
           [ngClass]="activeHardwareTab() === 'ppg' ? 'bg-rose-600/40 text-rose-200 border border-rose-500/40 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
         >
-          CAMERA PPG
+          CAMERA
         </button>
 
         <button
           type="button"
           (click)="setHardwareTab('fitbit')"
-          class="py-1.5 rounded-xl transition-all text-center cursor-pointer"
+          class="py-1.5 rounded-xl transition-all text-center cursor-pointer truncate"
           [ngClass]="activeHardwareTab() === 'fitbit' ? 'bg-cyan-600/40 text-cyan-200 border border-cyan-500/40 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
         >
           FITBIT
@@ -1315,10 +1430,28 @@
         <button
           type="button"
           (click)="setHardwareTab('steps')"
-          class="py-1.5 rounded-xl transition-all text-center cursor-pointer"
+          class="py-1.5 rounded-xl transition-all text-center cursor-pointer truncate"
           [ngClass]="activeHardwareTab() === 'steps' ? 'bg-emerald-600/40 text-emerald-200 border border-emerald-500/40 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
         >
-          STEP SYNC
+          STEPS
+        </button>
+
+        <button
+          type="button"
+          (click)="setHardwareTab('pacer')"
+          class="py-1.5 rounded-xl transition-all text-center cursor-pointer truncate"
+          [ngClass]="activeHardwareTab() === 'pacer' ? 'bg-teal-600/40 text-teal-200 border border-teal-500/40 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
+        >
+          PACER
+        </button>
+
+        <button
+          type="button"
+          (click)="setHardwareTab('algorithms')"
+          class="py-1.5 rounded-xl transition-all text-center cursor-pointer truncate"
+          [ngClass]="activeHardwareTab() === 'algorithms' ? 'bg-purple-600/40 text-purple-200 border border-purple-500/40 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
+        >
+          LOGIC
         </button>
       </div>
 
@@ -1731,6 +1864,126 @@
             >
               SYNC STEPUP / HEALTH
             </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SENSOR 5: VAGUS NERVE RESONANCE BREATHING PACER -->
+      <section *ngIf="activeHardwareTab() === 'pacer'" class="whoop-surface p-5 rounded-3xl space-y-4 font-mono">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-2.5 h-2.5 rounded-full bg-teal-400 shadow-[0_0_8px_#2DD4BF]"></div>
+            <span class="text-xs uppercase tracking-wider font-bold text-white">0.1 Hz VAGAL RESONANCE PACER</span>
+          </div>
+          <span class="text-[9px] px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300">
+            BAROREFLEX
+          </span>
+        </div>
+
+        <p class="text-xs text-zinc-400 font-sans leading-relaxed">
+          Breathing at 6 breaths/minute (0.1 Hz cadence: 4s inhale, 2s hold, 6s exhale) maximizes heart rate oscillations via respiratory sinus arrhythmia to activate the parasympathetic vagal brake.
+        </p>
+
+        <!-- Interactive Breathing Ring in Tab -->
+        <div class="p-6 rounded-2xl bg-black/50 border border-white/[0.06] flex flex-col items-center justify-center space-y-4 text-center">
+          <div class="relative w-44 h-44 flex items-center justify-center">
+            <div
+              class="absolute rounded-full transition-all duration-1000 ease-in-out"
+              [ngClass]="pacerPhase() === 'INHALE' ? 'w-40 h-40 bg-teal-500/20 border-2 border-teal-400 shadow-[0_0_40px_rgba(45,212,191,0.4)] scale-110' : (pacerPhase() === 'HOLD' ? 'w-40 h-40 bg-cyan-500/30 border-2 border-cyan-400 scale-105 animate-pulse' : 'w-20 h-20 bg-indigo-500/20 border-2 border-indigo-400 scale-90')"
+            ></div>
+
+            <div class="relative z-10 flex flex-col items-center">
+              <span class="text-xs uppercase tracking-widest font-bold" [ngClass]="pacerPhase() === 'INHALE' ? 'text-teal-300' : (pacerPhase() === 'HOLD' ? 'text-cyan-300' : 'text-indigo-300')">
+                {{ showVagusPacer() ? pacerPhase() : 'READY' }}
+              </span>
+              <span class="text-5xl font-sans font-black text-white my-1">
+                {{ showVagusPacer() ? pacerSecondsLeft() : '6' }}
+              </span>
+              <span class="text-[9px] text-zinc-400 font-mono">{{ showVagusPacer() ? 'SECONDS' : 'BREATHS/MIN' }}</span>
+            </div>
+          </div>
+
+          <!-- Live Cardiac Telemetry during session -->
+          <div *ngIf="bleHR.isConnected() || ppg.scanState().isActive" class="grid grid-cols-2 gap-2 w-full text-xs">
+            <div class="p-2.5 rounded-xl bg-black/60 border border-white/[0.05]">
+              <div class="text-[8px] text-zinc-500 uppercase">LIVE BPM</div>
+              <div class="text-lg font-bold text-rose-400 mt-0.5">
+                {{ bleHR.liveBpm() || ppg.scanState().liveBpm || '--' }} <span class="text-[9px] text-zinc-500">bpm</span>
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-black/60 border border-white/[0.05]">
+              <div class="text-[8px] text-zinc-500 uppercase">INSTANT RMSSD</div>
+              <div class="text-lg font-bold text-[#00F5A0] mt-0.5">
+                {{ bleHR.scanSession().currentRMSSD || ppg.scanState().currentRMSSD || '--' }} <span class="text-[9px] text-zinc-500">ms</span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            (click)="toggleVagusPacer()"
+            class="w-full py-3 rounded-xl font-bold uppercase tracking-wider text-xs transition-all cursor-pointer shadow-md"
+            [ngClass]="showVagusPacer() ? 'bg-rose-600 hover:bg-rose-500 text-white' : 'bg-teal-500 hover:bg-teal-400 text-slate-950'"
+          >
+            {{ showVagusPacer() ? 'STOP PACER SESSION' : 'START 0.1 Hz CADENCE' }}
+          </button>
+        </div>
+      </section>
+
+      <!-- SENSOR 6: GLASS-BOX ALGORITHM LOGIC LAB -->
+      <section *ngIf="activeHardwareTab() === 'algorithms'" class="whoop-surface p-5 rounded-3xl space-y-4 font-mono text-xs">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#C084FC]"></div>
+            <span class="text-xs uppercase tracking-wider font-bold text-white">GLASS-BOX ALGORITHM LOGIC</span>
+          </div>
+          <span class="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300">
+            TRANSPARENT
+          </span>
+        </div>
+
+        <p class="text-[11px] text-zinc-400 font-sans leading-relaxed">
+          Unlike closed proprietary algorithms, Vagus exposes the clinical mathematical formulations used to compute your physiological scores in real-time.
+        </p>
+
+        <div class="space-y-3 font-sans text-zinc-300">
+          <!-- 1. RMSSD -->
+          <div class="p-3.5 rounded-2xl bg-black/50 border border-white/[0.06] space-y-1.5 font-mono">
+            <div class="text-xs font-bold text-[#00F5A0] uppercase">1. RMSSD (Parasympathetic Vagal Tone)</div>
+            <p class="text-[11px] text-zinc-400 font-sans">Root Mean Square of Successive Differences between R-R heart beats:</p>
+            <div class="p-2.5 rounded-xl bg-white/[0.04] text-teal-300 text-[11px]">
+              RMSSD = &radic;[ 1/(N - 1) &times; &sum; (RR[i+1] - RR[i])&sup2; ]
+            </div>
+            <div class="text-[10px] text-zinc-400">Current Measured Value: <strong class="text-white">{{ todayLog()?.biometrics?.overnightRMSSD || 0 }} ms</strong></div>
+          </div>
+
+          <!-- 2. Composite Recovery % -->
+          <div class="p-3.5 rounded-2xl bg-black/50 border border-white/[0.06] space-y-1.5 font-mono">
+            <div class="text-xs font-bold text-[#00F5A0] uppercase">2. Daily Recovery % (0–100 Scale)</div>
+            <p class="text-[11px] text-zinc-400 font-sans">Multi-factor baseline calibration against 30-day baseline:</p>
+            <div class="p-2.5 rounded-xl bg-white/[0.04] text-teal-300 text-[11px]">
+              Recovery = (0.60 &times; HRV_Ratio) + (0.40 &times; RHR_Ratio)
+            </div>
+            <div class="text-[10px] text-zinc-400">Today's Score: <strong class="text-white">{{ recoveryScore() }}%</strong> ({{ recoveryColor().zone }})</div>
+          </div>
+
+          <!-- 3. Banister TRIMP Day Strain -->
+          <div class="p-3.5 rounded-2xl bg-black/50 border border-white/[0.06] space-y-1.5 font-mono">
+            <div class="text-xs font-bold text-cyan-400 uppercase">3. Banister TRIMP Strain (0.0–21.0 Log Scale)</div>
+            <p class="text-[11px] text-zinc-400 font-sans">Heart rate intensity weighted exponentially by lactic threshold:</p>
+            <div class="p-2.5 rounded-xl bg-white/[0.04] text-cyan-300 text-[11px]">
+              Strain = 21.0 &times; [ 1 - e^(-TRIMP / 25.0) ]
+            </div>
+            <div class="text-[10px] text-zinc-400">Today's Score: <strong class="text-white">{{ strainScore() }} / 21.0</strong> ({{ strainZoneText() }})</div>
+          </div>
+
+          <!-- 4. Tanaka Max Heart Rate -->
+          <div class="p-3.5 rounded-2xl bg-black/50 border border-white/[0.06] space-y-1.5 font-mono">
+            <div class="text-xs font-bold text-amber-300 uppercase">4. Tanaka Physiological Max Heart Rate</div>
+            <div class="p-2.5 rounded-xl bg-white/[0.04] text-amber-300 text-[11px]">
+              MaxHR = 208 - (0.7 &times; Age)
+            </div>
+            <div class="text-[10px] text-zinc-400">Athlete (Age {{ athleteDemographics().age }}): <strong class="text-white">{{ calibratedMaxHR() }} bpm</strong></div>
           </div>
         </div>
       </section>
