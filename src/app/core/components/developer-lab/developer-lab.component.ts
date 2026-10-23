@@ -2,7 +2,7 @@ import { Component, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { BleHeartRateService } from '../../services/ble-heart-rate.service';
 import { CameraPpgService } from '../../services/camera-ppg.service';
-import { XiaomiIntegrationService } from '../../services/xiaomi-integration.service';
+import { FitbitIntegrationService } from '../../services/fitbit-integration.service';
 import { PhysicsEngineService } from '../../services/physics-engine.service';
 import { DataBridgeService } from '../../services/data-bridge.service';
 
@@ -26,7 +26,7 @@ export interface TelemetryComparisonRecord {
 export class DeveloperLabComponent {
   public readonly bleHR = inject(BleHeartRateService);
   public readonly ppg = inject(CameraPpgService);
-  public readonly xiaomi = inject(XiaomiIntegrationService);
+  public readonly fitbit = inject(FitbitIntegrationService);
   public readonly physicsEngine = inject(PhysicsEngineService);
   public readonly dataBridge = inject(DataBridgeService);
 
@@ -80,7 +80,7 @@ export class DeveloperLabComponent {
   public readonly rmssdComparison = computed(() => {
     const polarRMSSD = this.bleHR.scanSession().currentRMSSD;
     const ppgRMSSD = this.ppg.scanState().currentRMSSD;
-    const xiaomiEstimated = this.xiaomi.lastImport()?.calculatedRecovery ?? null;
+    const fitbitEstimated = this.fitbit.lastImport()?.calculatedRecovery ?? null;
 
     let delta: number | null = null;
     if (polarRMSSD > 0 && ppgRMSSD > 0) {
@@ -90,7 +90,7 @@ export class DeveloperLabComponent {
     return {
       polar: polarRMSSD > 0 ? polarRMSSD : null,
       ppg: ppgRMSSD > 0 ? ppgRMSSD : null,
-      xiaomi: xiaomiEstimated,
+      fitbit: fitbitEstimated,
       delta,
     };
   });
@@ -117,12 +117,12 @@ export class DeveloperLabComponent {
           beatsLogged: this.ppg.scanState().capturedIBIs.length,
           waveformSamples: this.ppg.scanState().signalWaveform.slice(-10),
         },
-        xiaomiHub: {
-          lastImportDate: this.xiaomi.lastImport()?.date || null,
-          totalSleepMin: this.xiaomi.lastImport()?.totalSleepMin || null,
-          deepSleepMin: this.xiaomi.lastImport()?.deepSleepMin || null,
-          remSleepMin: this.xiaomi.lastImport()?.remSleepMin || null,
-          restingHR: this.xiaomi.lastImport()?.restingHR || null,
+        fitbitHub: {
+          lastImportDate: this.fitbit.lastImport()?.date || null,
+          totalSleepMin: this.fitbit.lastImport()?.totalSleepMin || null,
+          deepSleepMin: this.fitbit.lastImport()?.deepSleepMin || null,
+          remSleepMin: this.fitbit.lastImport()?.remSleepMin || null,
+          restingHR: this.fitbit.lastImport()?.restingHR || null,
         },
       },
       comparison: {

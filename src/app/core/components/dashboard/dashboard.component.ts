@@ -7,7 +7,7 @@ import { PhysicsEngineService } from '../../services/physics-engine.service';
 import { PedometerService } from '../../services/pedometer.service';
 import { BleHeartRateService, BleWorkoutTimelinePoint, SportActivityDef, AVAILABLE_SPORTS } from '../../services/ble-heart-rate.service';
 import { CameraPpgService } from '../../services/camera-ppg.service';
-import { XiaomiIntegrationService } from '../../services/xiaomi-integration.service';
+import { FitbitIntegrationService } from '../../services/fitbit-integration.service';
 import { DailyBiometricLog, JournalHabits, RecordedWorkoutActivity } from '../../models/biometrics.interface';
 
 @Component({
@@ -26,7 +26,7 @@ export class DashboardComponent implements OnInit {
   public readonly pedometer = inject(PedometerService);
   public readonly bleHR = inject(BleHeartRateService);
   public readonly ppg = inject(CameraPpgService);
-  public readonly xiaomi = inject(XiaomiIntegrationService);
+  public readonly fitbit = inject(FitbitIntegrationService);
 
   // Active user ID derived from Auth state
   public readonly activeUserId = computed(() => {
@@ -86,8 +86,8 @@ export class DashboardComponent implements OnInit {
   }
 
   // Active Hardware Sub-Tab
-  public readonly activeHardwareTab = signal<'polar' | 'ppg' | 'xiaomi' | 'steps'>('polar');
-  public setHardwareTab(tab: 'polar' | 'ppg' | 'xiaomi' | 'steps'): void {
+  public readonly activeHardwareTab = signal<'polar' | 'ppg' | 'fitbit' | 'steps'>('polar');
+  public setHardwareTab(tab: 'polar' | 'ppg' | 'fitbit' | 'steps'): void {
     this.activeHardwareTab.set(tab);
   }
 
@@ -550,8 +550,8 @@ export class DashboardComponent implements OnInit {
     }
   }
 
-  // Xiaomi JSON file importer
-  public onXiaomiFileSelected(event: Event): void {
+  // Fitbit JSON file importer
+  public onFitbitFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (!input.files || input.files.length === 0) return;
 
@@ -560,10 +560,18 @@ export class DashboardComponent implements OnInit {
     reader.onload = async (e) => {
       const content = e.target?.result as string;
       if (content) {
-        await this.xiaomi.parseAndIngestXiaomiJson(content, this.activeUserId());
+        await this.fitbit.parseAndIngestFitbitJson(content, this.activeUserId());
       }
     };
     reader.readAsText(file);
+  }
+
+  public async triggerFitbitSync(): Promise<void> {
+    await this.fitbit.syncWithHealthConnect(this.activeUserId());
+  }
+
+  public async connectFitbitBroadcast(): Promise<void> {
+    await this.fitbit.connectFitbitBroadcast();
   }
 
   public formatMinutesToHours(minutes: number): string {

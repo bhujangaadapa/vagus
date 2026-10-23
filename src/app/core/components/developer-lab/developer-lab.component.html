@@ -10,7 +10,7 @@
         </h1>
       </div>
       <p class="text-xs text-slate-400 mt-1 font-sans">
-        Side-by-side ground truth verification: <strong class="text-indigo-400">Polar ECG</strong> vs <strong class="text-rose-400">Camera Optical PPG</strong> vs <strong class="text-amber-400">Xiaomi Smart Band</strong>.
+        Side-by-side ground truth verification: <strong class="text-indigo-400">Polar ECG</strong> vs <strong class="text-rose-400">Camera Optical PPG</strong> vs <strong class="text-cyan-400">Fitbit (Charge 6 / Air)</strong>.
       </p>
     </div>
 
@@ -141,36 +141,36 @@
       </div>
     </div>
 
-    <!-- CARD 3: XIAOMI SMART BAND 8 / 9 -->
-    <div class="p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-amber-950/30 to-slate-950 border border-amber-900/40 shadow-md space-y-3">
+    <!-- CARD 3: FITBIT CHARGE 6 / AIR -->
+    <div class="p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-cyan-950/30 to-slate-950 border border-cyan-900/40 shadow-md space-y-3">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <span class="w-2.5 h-2.5 rounded-full" [ngClass]="xiaomi.lastImport() ? 'bg-amber-400' : 'bg-slate-600'"></span>
-          <span class="text-xs font-bold text-amber-300 uppercase">3. XIAOMI BAND 8 / 9</span>
+          <span class="w-2.5 h-2.5 rounded-full" [ngClass]="fitbit.lastImport() ? 'bg-cyan-400' : 'bg-slate-600'"></span>
+          <span class="text-xs font-bold text-cyan-300 uppercase">3. FITBIT CHARGE 6 / AIR</span>
         </div>
-        <span class="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/40 text-amber-300">
-          $35 WEARABLE
+        <span class="text-[9px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/40 text-cyan-300">
+          HEALTH CONNECT & BLE
         </span>
       </div>
 
       <div class="space-y-1">
         <div class="text-[10px] text-slate-500 uppercase">DATA INGESTION SOURCE</div>
         <div class="text-xs font-bold text-slate-200 truncate">
-          {{ xiaomi.lastImport() ? ('Imported Log (' + xiaomi.lastImport()?.date + ')') : 'Awaiting Mi Fitness / Gadgetbridge File' }}
+          {{ fitbit.lastImport() ? ('Imported Log (' + fitbit.lastImport()?.date + ')') : 'Awaiting Health Connect Sync / JSON' }}
         </div>
       </div>
 
       <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
         <div class="p-2 rounded bg-slate-950/60 border border-slate-800/80">
           <div class="text-[9px] text-slate-500 uppercase">RESTING HR</div>
-          <div class="text-2xl font-bold text-amber-300 mt-0.5">
-            {{ xiaomi.lastImport()?.restingHR || '--' }} <span class="text-xs text-slate-500 font-normal">bpm</span>
+          <div class="text-2xl font-bold text-cyan-300 mt-0.5">
+            {{ fitbit.lastImport()?.restingHR || '--' }} <span class="text-xs text-slate-500 font-normal">bpm</span>
           </div>
         </div>
         <div class="p-2 rounded bg-slate-950/60 border border-slate-800/80">
           <div class="text-[9px] text-slate-500 uppercase">RECOVERY %</div>
           <div class="text-2xl font-bold text-emerald-400 mt-0.5">
-            {{ xiaomi.lastImport()?.calculatedRecovery || '--' }}<span class="text-xs text-slate-500 font-normal">%</span>
+            {{ fitbit.lastImport()?.calculatedRecovery || '--' }}<span class="text-xs text-slate-500 font-normal">%</span>
           </div>
         </div>
       </div>
@@ -178,15 +178,15 @@
       <div class="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800/80 text-[11px] space-y-1">
         <div class="flex justify-between">
           <span class="text-slate-500">Sleep Architecture:</span>
-          <span class="text-slate-300">{{ xiaomi.lastImport() ? (xiaomi.lastImport()?.deepSleepMin + 'm Deep / ' + xiaomi.lastImport()?.remSleepMin + 'm REM') : 'N/A' }}</span>
+          <span class="text-slate-300">{{ fitbit.lastImport() ? (fitbit.lastImport()?.deepSleepMin + 'm Deep / ' + fitbit.lastImport()?.remSleepMin + 'm REM') : 'N/A' }}</span>
         </div>
         <div class="flex justify-between">
           <span class="text-slate-500">Steps Recorded:</span>
-          <span class="text-slate-300">{{ xiaomi.lastImport()?.steps || '0' }}</span>
+          <span class="text-slate-300">{{ fitbit.lastImport()?.steps || '0' }}</span>
         </div>
         <div class="flex justify-between">
           <span class="text-slate-500">Hardware Class:</span>
-          <span class="text-amber-300">Dual-Channel PPG (Wrist)</span>
+          <span class="text-cyan-300">Google ML Optical PPG + Health Connect</span>
         </div>
       </div>
     </div>

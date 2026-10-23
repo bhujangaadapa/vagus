@@ -1305,11 +1305,11 @@
 
         <button
           type="button"
-          (click)="setHardwareTab('xiaomi')"
+          (click)="setHardwareTab('fitbit')"
           class="py-1.5 rounded-xl transition-all text-center cursor-pointer"
-          [ngClass]="activeHardwareTab() === 'xiaomi' ? 'bg-amber-600/40 text-amber-200 border border-amber-500/40 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
+          [ngClass]="activeHardwareTab() === 'fitbit' ? 'bg-cyan-600/40 text-cyan-200 border border-cyan-500/40 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
         >
-          XIAOMI BAND
+          FITBIT
         </button>
 
         <button
@@ -1554,52 +1554,86 @@
         </div>
       </section>
 
-      <!-- SENSOR 3: XIAOMI SMART BAND 8/9/10/11 INTEGRATION -->
-      <section *ngIf="activeHardwareTab() === 'xiaomi'" class="whoop-surface p-5 rounded-3xl space-y-4">
+      <!-- SENSOR 3: FITBIT CHARGE 6 / FITBIT AIR INTEGRATION -->
+      <section *ngIf="activeHardwareTab() === 'fitbit'" class="whoop-surface p-5 rounded-3xl space-y-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <div class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_#FFB800]"></div>
-            <span class="text-xs font-mono uppercase tracking-wider font-bold text-white">XIAOMI SMART BAND HUB</span>
+            <div class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#00B0B9]"></div>
+            <span class="text-xs font-mono uppercase tracking-wider font-bold text-white">FITBIT (CHARGE 6 / AIR / GOOGLE)</span>
           </div>
-          <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300">
-            $35 WHOOP SETUP
+          <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+            HEALTH CONNECT & BLE
           </span>
         </div>
 
         <div class="space-y-3 font-mono text-xs">
-          <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] space-y-1.5 font-sans">
-            <div class="text-xs font-mono font-bold text-amber-300 uppercase">1. BLE Broadcast Mode</div>
-            <p class="text-[11px] text-zinc-400 leading-relaxed">
-              In <strong class="text-zinc-200">Mi Fitness</strong>: Go to <span class="font-mono text-zinc-300">Device &rarr; Band Settings &rarr; Heart Rate Sharing / Broadcast</span> and turn it <strong>ON</strong>. Then switch to the <strong>POLAR H7</strong> tab and tap <strong>PAIR</strong> to stream live heart rate!
-            </p>
-          </div>
-
+          <!-- 1. Direct BLE Heart Rate Broadcast (Charge 6) -->
           <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] space-y-2 font-sans">
             <div class="flex items-center justify-between font-mono">
-              <span class="text-xs font-bold text-amber-300 uppercase">2. Ingest Mi Fitness JSON</span>
-              <span *ngIf="xiaomi.isImporting()" class="text-[10px] text-amber-400 animate-pulse">IMPORTING...</span>
+              <span class="text-xs font-bold text-cyan-300 uppercase">1. Live Heart Rate Broadcast (Charge 6)</span>
+              <span class="text-[9px] px-2 py-0.5 rounded-full bg-white/[0.05] text-zinc-400">BLE 0x180D</span>
+            </div>
+            <p class="text-[11px] text-zinc-400 leading-relaxed">
+              On your <strong class="text-zinc-200">Charge 6</strong>: Open <span class="font-mono text-cyan-300">Settings &rarr; Heart Rate &rarr; Share to Devices: ON</span> (or choose <em>Heart Rate Broadcast</em> before a workout), then tap below to stream live:
+            </p>
+            <button
+              type="button"
+              (click)="connectFitbitBroadcast()"
+              class="w-full py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+            >
+              CONNECT CHARGE 6 VIA BLE
+            </button>
+          </div>
+
+          <!-- 2. Health Connect & HealthKit Auto-Sync -->
+          <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] space-y-2 font-sans">
+            <div class="flex items-center justify-between font-mono">
+              <span class="text-xs font-bold text-cyan-300 uppercase">2. Sleep & Recovery Sync</span>
+              <span *ngIf="fitbit.isSyncing()" class="text-[10px] text-cyan-400 animate-pulse">SYNCING...</span>
+            </div>
+            <p class="text-[11px] text-zinc-400 leading-relaxed">
+              Pull overnight Deep Sleep, REM Sleep, and Resting HR directly from <strong class="text-zinc-200">Google Health Connect</strong> (Android) or <strong class="text-zinc-200">Apple Health</strong> (iOS) into Vagus:
+            </p>
+            <button
+              type="button"
+              (click)="triggerFitbitSync()"
+              [disabled]="fitbit.isSyncing()"
+              class="w-full py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] text-white font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+            >
+              {{ fitbit.isSyncing() ? 'SYNCING HEALTH DATA...' : 'SYNC OVERNIGHT VITALS NOW' }}
+            </button>
+          </div>
+
+          <!-- 3. Google Takeout / Fitbit JSON File Import -->
+          <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] space-y-2 font-sans">
+            <div class="flex items-center justify-between font-mono">
+              <span class="text-xs font-bold text-zinc-400 uppercase">3. Ingest Fitbit JSON Export</span>
             </div>
             <p class="text-[11px] text-zinc-400">
-              Upload exported sleep & biometrics JSON from Mi Fitness or Gadgetbridge to automatically ingest Deep/REM sleep stages:
+              Upload exported sleep JSON from Google Takeout or Fitbit export:
             </p>
 
             <label class="block mt-2 font-mono">
               <input
                 type="file"
                 accept=".json"
-                (change)="onXiaomiFileSelected($event)"
-                class="block w-full text-xs text-zinc-400 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-500/20 file:text-amber-300 hover:file:bg-amber-500/30 cursor-pointer"
+                (change)="onFitbitFileSelected($event)"
+                class="block w-full text-xs text-zinc-400 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-cyan-500/20 file:text-cyan-300 hover:file:bg-cyan-500/30 cursor-pointer"
               />
             </label>
 
             <!-- Success Summary -->
-            <div *ngIf="xiaomi.lastImport()" class="mt-2 p-3 rounded-xl bg-[#00F5A0]/10 border border-[#00F5A0]/30 font-mono text-xs text-[#00F5A0] space-y-1">
-              <div class="font-bold text-[11px] uppercase">✓ Ingested Xiaomi Biometrics ({{ xiaomi.lastImport()?.date }})</div>
+            <div *ngIf="fitbit.lastImport()" class="mt-2 p-3 rounded-xl bg-[#00F5A0]/10 border border-[#00F5A0]/30 font-mono text-xs text-[#00F5A0] space-y-1">
+              <div class="font-bold text-[11px] uppercase">✓ Ingested Fitbit Biometrics ({{ fitbit.lastImport()?.date }})</div>
               <div class="grid grid-cols-3 gap-2 pt-1 text-[10px] text-zinc-300">
-                <div>SLEEP: <strong class="text-white">{{ formatMinutesToHours(xiaomi.lastImport()?.totalSleepMin || 0) }}</strong></div>
-                <div>DEEP/REM: <strong class="text-white">{{ xiaomi.lastImport()?.deepSleepMin }}m / {{ xiaomi.lastImport()?.remSleepMin }}m</strong></div>
-                <div>RECOVERY: <strong class="text-[#00F5A0]">{{ xiaomi.lastImport()?.calculatedRecovery }}%</strong></div>
+                <div>SLEEP: <strong class="text-white">{{ formatMinutesToHours(fitbit.lastImport()?.totalSleepMin || 0) }}</strong></div>
+                <div>DEEP/REM: <strong class="text-white">{{ fitbit.lastImport()?.deepSleepMin }}m / {{ fitbit.lastImport()?.remSleepMin }}m</strong></div>
+                <div>RECOVERY: <strong class="text-[#00F5A0]">{{ fitbit.lastImport()?.calculatedRecovery }}%</strong></div>
               </div>
+            </div>
+
+            <div *ngIf="fitbit.syncError()" class="mt-2 text-rose-400 text-[10px] font-mono">
+              {{ fitbit.syncError() }}
             </div>
           </div>
         </div>
