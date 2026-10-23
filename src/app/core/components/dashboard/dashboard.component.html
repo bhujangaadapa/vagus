@@ -1501,6 +1501,22 @@
           >
             📸 START CAMERA PPG SCAN (45 SEC)
           </button>
+
+          <!-- Error Alert if Camera Access Fails -->
+          <div *ngIf="ppg.errorMessage()" class="p-3 rounded-2xl bg-rose-950/60 border border-rose-500/50 text-rose-300 text-xs font-mono space-y-2">
+            <div class="flex items-center gap-2 font-bold text-rose-200">
+              <span>⚠️</span>
+              <span>CAMERA INITIALIZATION ERROR</span>
+            </div>
+            <p class="text-[11px] leading-relaxed">{{ ppg.errorMessage() }}</p>
+            <button
+              type="button"
+              (click)="startCameraPpg(45)"
+              class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-[10px] uppercase transition-colors"
+            >
+              RETRY CAMERA PERMISSION
+            </button>
+          </div>
         </div>
 
         <div *ngIf="ppg.scanState().isActive" class="space-y-3 font-mono">

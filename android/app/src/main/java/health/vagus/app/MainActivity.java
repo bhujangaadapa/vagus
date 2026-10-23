@@ -43,9 +43,18 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
             stepDetectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR);
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{Manifest.permission.ACTIVITY_RECOGNITION}, PERMISSION_REQ_CODE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            java.util.ArrayList<String> permList = new java.util.ArrayList<>();
+            if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                permList.add(Manifest.permission.CAMERA);
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
+                    permList.add(Manifest.permission.ACTIVITY_RECOGNITION);
+                }
+            }
+            if (!permList.isEmpty()) {
+                requestPermissions(permList.toArray(new String[0]), PERMISSION_REQ_CODE);
             }
         }
     }
@@ -244,6 +253,17 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
         @JavascriptInterface
         public void setInitialBaseline(int currentSteps) {
             calibrateBaseline(currentSteps);
+        }
+
+        @JavascriptInterface
+        public void requestCameraPermission() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                runOnUiThread(() -> {
+                    if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[]{Manifest.permission.CAMERA}, PERMISSION_REQ_CODE);
+                    }
+                });
+            }
         }
 
         @JavascriptInterface

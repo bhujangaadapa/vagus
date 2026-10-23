@@ -68,24 +68,46 @@ export class CameraPpgService {
   public async startPpgScan(durationSeconds: number = 45): Promise<boolean> {
     this.errorMessage.set(null);
 
-    if (!this.isSupported()) {
-      this.errorMessage.set('Camera access is not supported in this browser environment.');
+    // If native Android bridge is available, request native camera permission first
+    const bridge = typeof window !== 'undefined' ? (window as any).AndroidHardwarePedometer : null;
+    if (bridge && typeof bridge.requestCameraPermission === 'function') {
+      bridge.requestCameraPermission();
+    }
+
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      this.errorMessage.set('Camera access is not supported in this client.');
       return false;
     }
 
     try {
-      // Request rear camera with maximum frame rate and torch constraint
-      const constraints: MediaStreamConstraints = {
-        audio: false,
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 192 },
-          height: { ideal: 192 },
-          frameRate: { ideal: 30, max: 60 },
-        },
-      };
+      // Robust constraint hierarchy to support both high-end and budget Android rear cameras
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 192 },
+            height: { ideal: 192 },
+          },
+        });
+      } catch (err1) {
+        console.warn('[CameraPPG] Specific rear camera constraints failed, attempting basic facingMode:', err1);
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { facingMode: 'environment' },
+          });
+        } catch (err2) {
+          console.warn('[CameraPPG] Rear camera facingMode failed, falling back to any video stream:', err2);
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: true,
+          });
+        }
+      }
 
-      this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      this.mediaStream = stream;
 
       // Attempt to enable torch / flash if supported
       const track = this.mediaStream.getVideoTracks()[0];
@@ -98,12 +120,26 @@ export class CameraPpgService {
         }
       }
 
-      // Initialize hidden offscreen video and canvas elements
+      // Initialize video element and attach offscreen to DOM so Chromium decodes frames
       if (!this.videoElement) {
         this.videoElement = document.createElement('video');
         this.videoElement.setAttribute('playsinline', 'true');
+        this.videoElement.setAttribute('muted', 'true');
+        this.videoElement.setAttribute('autoplay', 'true');
         this.videoElement.muted = true;
+        this.videoElement.style.position = 'fixed';
+        this.videoElement.style.top = '-9999px';
+        this.videoElement.style.left = '-9999px';
+        this.videoElement.style.width = '1px';
+        this.videoElement.style.height = '1px';
+        this.videoElement.style.opacity = '0';
+        this.videoElement.style.pointerEvents = 'none';
       }
+
+      if (typeof document !== 'undefined' && !document.body.contains(this.videoElement)) {
+        document.body.appendChild(this.videoElement);
+      }
+
       this.videoElement.srcObject = this.mediaStream;
       await this.videoElement.play();
 
@@ -143,7 +179,10 @@ export class CameraPpgService {
     } catch (err: any) {
       console.warn('[CameraPPG] Camera initialization failed:', err);
       this.stopPpgScan(false);
-      this.errorMessage.set(err.message || 'Could not access phone camera for PPG.');
+      const msg = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'
+        ? 'Camera permission denied. Please allow Camera access in Android App Settings.'
+        : (err.message || 'Could not access phone camera for PPG.');
+      this.errorMessage.set(msg);
       return false;
     }
   }
@@ -304,6 +343,11 @@ export class CameraPpgService {
       this.mediaStream = null;
     }
 
+    if (this.videoElement && typeof document !== 'undefined' && document.body.contains(this.videoElement)) {
+      document.body.removeChild(this.videoElement);
+      this.videoElement = null;
+    }
+
     if (saveData && this.recentIBIs.length >= 8) {
       this.completePpgScan();
     } else {
@@ -324,6 +368,11 @@ export class CameraPpgService {
     if (this.mediaStream) {
       this.mediaStream.getTracks().forEach((track) => track.stop());
       this.mediaStream = null;
+    }
+
+    if (this.videoElement && typeof document !== 'undefined' && document.body.contains(this.videoElement)) {
+      document.body.removeChild(this.videoElement);
+      this.videoElement = null;
     }
 
     const state = this.scanState();
