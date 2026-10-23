@@ -5,5 +5,8 @@ project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/
 include ':capacitor-community-bluetooth-le'
 project(':capacitor-community-bluetooth-le').projectDir = new File('../node_modules/@capacitor-community/bluetooth-le/android')
 
+include ':capacitor-health-fitness'
+project(':capacitor-health-fitness').projectDir = new File('../node_modules/@capacitor/health-fitness/android')
+
 include ':capgo-capacitor-pedometer'
 project(':capgo-capacitor-pedometer').projectDir = new File('../node_modules/@capgo/capacitor-pedometer/android')

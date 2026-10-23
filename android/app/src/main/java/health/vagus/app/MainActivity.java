@@ -26,6 +26,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     private static final String KEY_DATE = "step_date";
     private static final String KEY_STORED_STEPS = "stored_today_steps";
     private static final String KEY_BASELINE = "step_baseline";
+    private static final String KEY_LAST_RAW = "last_raw_hardware_steps";
 
     private SensorManager sensorManager;
     private Sensor stepCounterSensor;
@@ -107,18 +108,32 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
         String savedDate = prefs.getString(KEY_DATE, "");
         int storedSteps = prefs.getInt(KEY_STORED_STEPS, 0);
         int baseline = prefs.getInt(KEY_BASELINE, -1);
+        int lastRaw = prefs.getInt(KEY_LAST_RAW, -1);
 
         if (!todayStr.equals(savedDate)) {
-            // Midnight rollover: new calendar day starts at 0
-            baseline = totalHardwareSteps;
-            storedSteps = 0;
+            // New calendar day!
+            // If we have previous raw readings and the phone was not rebooted:
+            if (lastRaw > 0 && totalHardwareSteps >= lastRaw && (totalHardwareSteps - lastRaw) < 40000) {
+                // Morning steps taken before launching Vagus are automatically preserved!
+                baseline = lastRaw;
+                storedSteps = totalHardwareSteps - lastRaw;
+            } else {
+                baseline = totalHardwareSteps;
+                storedSteps = 0;
+            }
+
             prefs.edit()
                 .putString(KEY_DATE, todayStr)
                 .putInt(KEY_BASELINE, baseline)
-                .putInt(KEY_STORED_STEPS, 0)
+                .putInt(KEY_STORED_STEPS, storedSteps)
+                .putInt(KEY_LAST_RAW, totalHardwareSteps)
                 .apply();
-            return 0;
+
+            return storedSteps;
         }
+
+        // Always save latest raw count so tonight's midnight rollover knows the exact anchor
+        prefs.edit().putInt(KEY_LAST_RAW, totalHardwareSteps).apply();
 
         if (baseline == -1 || totalHardwareSteps < baseline) {
             baseline = Math.max(0, totalHardwareSteps - storedSteps);
@@ -152,6 +167,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
             .putString(KEY_DATE, todayStr)
             .putInt(KEY_STORED_STEPS, targetSteps)
             .putInt(KEY_BASELINE, baseline)
+            .putInt(KEY_LAST_RAW, raw)
             .apply();
 
         dispatchStepUpdate(targetSteps);

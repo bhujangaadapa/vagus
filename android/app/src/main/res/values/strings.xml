@@ -4,4 +4,5 @@
     <string name="title_activity_main">Vagus</string>
     <string name="package_name">health.vagus.app</string>
     <string name="custom_url_scheme">health.vagus.app</string>
+    <string name="background_notification_title">Measuring your health and fitness data.</string>    <string name="background_notification_description">The app is running in the background.</string>    <string name="privacy_policy_url">https://bhujangaadapa.github.io/vagus/privacy-policy.html</string>
 </resources>

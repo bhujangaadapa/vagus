@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { CapacitorPedometer, Measurement } from '@capgo/capacitor-pedometer';
+import { HealthFitness } from '@capacitor/health-fitness';
 import { DataBridgeService } from './data-bridge.service';
 
 export type SensorEngine =
@@ -85,9 +86,9 @@ export class PedometerService {
     // Auto-start tracking on initialization like StepUp
     this.autoStartTracking();
 
-    // Check hardware bridge with short delays in case WebView interface attaches right after bundle evaluation
+    // Check hardware bridge and Health Connect with short delays in case WebView interface attaches right after bundle evaluation
     if (typeof window !== 'undefined') {
-      [300, 1000, 2500].forEach((delay) => {
+      [400, 1500, 3500].forEach((delay) => {
         setTimeout(() => {
           const b = (window as any).AndroidHardwarePedometer;
           if (b && typeof b.getLiveSteps === 'function') {
@@ -100,6 +101,9 @@ export class PedometerService {
               this.isTracking.set(true);
               this.permissionState.set('GRANTED');
             }
+          }
+          if (Capacitor.isNativePlatform()) {
+            this.syncWithHealthConnect().catch(() => {});
           }
         }, delay);
       });
@@ -147,6 +151,8 @@ export class PedometerService {
       this.isTracking.set(true);
       this.permissionState.set('GRANTED');
       this.statusMessage.set('Hardware Step Sensor Active');
+      // Background auto-sync with StepUp / Google Health Connect
+      this.syncWithHealthConnect().catch(() => {});
       return true;
     }
 
@@ -285,6 +291,9 @@ export class PedometerService {
         bridge.requestPermission();
       }
 
+      // Also trigger Health Connect permission prompt / sync
+      this.syncWithHealthConnect().catch(() => {});
+
       try {
         const requested = await CapacitorPedometer.requestPermissions();
         if (requested.activityRecognition === 'granted') {
@@ -394,7 +403,10 @@ export class PedometerService {
       }
     }
 
-    // 1. Re-check native measurement on app wake
+    // 1. Re-sync with Google Health Connect & Apple HealthKit (e.g. from StepUp or Google Fit)
+    await this.syncWithHealthConnect();
+
+    // 2. Re-check native measurement on app wake
     if (Capacitor.isNativePlatform()) {
       try {
         const startOfDay = new Date();
@@ -408,6 +420,102 @@ export class PedometerService {
         }
       } catch {}
     }
+  }
+
+  /**
+   * Automatically synchronize cumulative daily steps from Health Connect / Apple HealthKit
+   */
+  public async syncWithHealthConnect(): Promise<number | null> {
+    if (!Capacitor.isNativePlatform()) return null;
+
+    try {
+      // 1. Request read permissions for fitness variables if needed
+      try {
+        await HealthFitness.requestHealthPermissions({
+          customPermissions: '[]',
+          allVariables: JSON.stringify({ IsActive: false, AccessType: 'READ' }),
+          fitnessVariables: JSON.stringify({ IsActive: true, AccessType: 'READ' }),
+          healthVariables: JSON.stringify({ IsActive: false, AccessType: 'READ' }),
+          profileVariables: JSON.stringify({ IsActive: false, AccessType: 'READ' }),
+          workoutVariables: JSON.stringify({ IsActive: false, AccessType: 'READ' }),
+        });
+      } catch (permErr) {
+        console.warn('[PedometerService] Health permissions query info:', permErr);
+      }
+
+      // 2. Query today's steps from 00:00:00 to now
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const now = new Date();
+
+      const isoDate = (d: Date) => d.toISOString().split('.')[0] + 'Z';
+
+      const res = await HealthFitness.getData({
+        parameters: JSON.stringify({
+          Variable: 'STEPS',
+          StartDate: isoDate(startOfDay),
+          EndDate: isoDate(now),
+          TimeUnit: 'DAY',
+          OperationType: 'SUM',
+          TimeUnitLength: 1,
+          AdvancedQueryReturnType: 'ALL_DATA',
+          AdvancedQueryResultType: 'RAW_DATA',
+        }),
+      });
+
+      if (res && res.results) {
+        let parsed: any;
+        try {
+          parsed = typeof res.results === 'string' ? JSON.parse(res.results) : res.results;
+        } catch {
+          parsed = null;
+        }
+
+        let totalSteps = 0;
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) {
+            const val =
+              item?.value ??
+              item?.steps ??
+              item?.count ??
+              item?.sum ??
+              item?.quantity ??
+              (typeof item === 'number' ? item : 0);
+            if (typeof val === 'number') {
+              totalSteps += Math.round(val);
+            }
+          }
+        } else if (typeof parsed === 'object' && parsed !== null) {
+          const val =
+            parsed?.value ??
+            parsed?.steps ??
+            parsed?.count ??
+            parsed?.sum ??
+            parsed?.quantity ??
+            0;
+          if (typeof val === 'number') totalSteps = Math.round(val);
+        }
+
+        if (totalSteps > 0 && totalSteps >= this.currentSteps()) {
+          console.info(`[PedometerService] Auto-synced ${totalSteps} steps from Health Connect / StepUp`);
+          this.currentSteps.set(totalSteps);
+          this.persistStepCount(totalSteps);
+          this.dataBridge.updateLiveSteps(this.currentUserId, this.currentDateStr, totalSteps);
+
+          // Calibrate native Android hardware baseline so future steps continue seamlessly from StepUp's count
+          const bridge = typeof window !== 'undefined' ? (window as any).AndroidHardwarePedometer : null;
+          if (bridge && typeof bridge.setInitialBaseline === 'function') {
+            bridge.setInitialBaseline(totalSteps);
+          }
+
+          this.statusMessage.set(`Auto-synced with Health Connect (${totalSteps.toLocaleString()} steps)`);
+          return totalSteps;
+        }
+      }
+    } catch (err) {
+      console.warn('[PedometerService] Health Connect query skipped:', err);
+    }
+    return null;
   }
 
   private persistStepCount(steps: number): void {

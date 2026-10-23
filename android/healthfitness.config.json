@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "STEPS": "ReadWrite",
+    "HEART_RATE": "Read",
+    "SLEEP": "Read",
+    "CALORIES_BURNED": "Read",
+    "DISTANCE": "Read"
+  },
+  "groupPermissions": {
+    "FITNESS_VARIABLES": "ReadWrite",
+    "HEALTH_VARIABLES": "Read"
+  },
+  "privacyPolicyUrl": "https://bhujangaadapa.github.io/vagus/privacy-policy.html"
+}
