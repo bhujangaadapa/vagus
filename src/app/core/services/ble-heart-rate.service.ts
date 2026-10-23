@@ -1,4 +1,6 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
+import { Capacitor } from '@capacitor/core';
+import { BleClient, numberToUUID } from '@capacitor-community/bluetooth-le';
 import { PhysicsEngineService } from './physics-engine.service';
 import { DataBridgeService } from './data-bridge.service';
 import { RecordedWorkoutActivity } from '../models/biometrics.interface';
@@ -107,10 +109,11 @@ export class BleHeartRateService {
   private bluetoothDevice: any = null;
   private gattServer: any = null;
   private hrCharacteristic: any = null;
+  private nativeDeviceId: string | null = null;
 
   // Reactive signals
   public readonly isSupported = signal<boolean>(
-    typeof navigator !== 'undefined' && 'bluetooth' in navigator
+    Capacitor.isNativePlatform() || (typeof navigator !== 'undefined' && 'bluetooth' in navigator)
   );
   public readonly isConnecting = signal<boolean>(false);
   public readonly isConnected = signal<boolean>(false);
@@ -231,7 +234,7 @@ export class BleHeartRateService {
 
     if (!this.isSupported()) {
       this.errorMessage.set(
-        'Web Bluetooth is not supported on this browser. Please use Google Chrome or Microsoft Edge on Android, Windows, Mac, or Linux.'
+        'Bluetooth is not supported on this device/browser.'
       );
       return false;
     }
@@ -239,6 +242,49 @@ export class BleHeartRateService {
     try {
       this.isConnecting.set(true);
 
+      // 1. Native Android / iOS via Capacitor Bluetooth LE Plugin
+      if (Capacitor.isNativePlatform()) {
+        await BleClient.initialize();
+        const HEART_RATE_SERVICE = numberToUUID(0x180D);
+        const HEART_RATE_MEASUREMENT = numberToUUID(0x2A37);
+        const BATTERY_SERVICE = numberToUUID(0x180F);
+        const BATTERY_LEVEL = numberToUUID(0x2A19);
+
+        const device = await BleClient.requestDevice({
+          services: [HEART_RATE_SERVICE],
+          optionalServices: [BATTERY_SERVICE],
+        });
+
+        this.nativeDeviceId = device.deviceId;
+        this.deviceName.set(device.name || 'Polar H7 Chest Strap');
+
+        await BleClient.connect(device.deviceId, (deviceId) => {
+          console.warn('[BleHeartRate] Device disconnected:', deviceId);
+          this.handleDisconnect();
+        });
+
+        await BleClient.startNotifications(
+          device.deviceId,
+          HEART_RATE_SERVICE,
+          HEART_RATE_MEASUREMENT,
+          (value: DataView) => {
+            this.processHeartRateDataView(value);
+          }
+        );
+
+        try {
+          const batteryVal = await BleClient.read(device.deviceId, BATTERY_SERVICE, BATTERY_LEVEL);
+          if (batteryVal && batteryVal.byteLength > 0) {
+            this.batteryLevel.set(batteryVal.getUint8(0));
+          }
+        } catch {}
+
+        this.isConnected.set(true);
+        this.isConnecting.set(false);
+        return true;
+      }
+
+      // 2. Web Bluetooth for Desktop/Mobile Chrome / Edge
       const nav = navigator as any;
       const device = await nav.bluetooth.requestDevice({
         filters: [{ services: ['heart_rate'] }],
@@ -291,11 +337,16 @@ export class BleHeartRateService {
   /**
    * Disconnect from active Bluetooth device
    */
-  public disconnect(): void {
+  public async disconnect(): Promise<void> {
     this.stopReadinessScan(false);
     this.stopWorkout(false);
 
-    if (this.gattServer && this.gattServer.connected) {
+    if (Capacitor.isNativePlatform() && this.nativeDeviceId) {
+      try {
+        await BleClient.disconnect(this.nativeDeviceId);
+      } catch {}
+      this.nativeDeviceId = null;
+    } else if (this.gattServer && this.gattServer.connected) {
       this.gattServer.disconnect();
     }
     this.handleDisconnect();
@@ -316,7 +367,10 @@ export class BleHeartRateService {
   private handleHeartRateNotification(event: any): void {
     const value: DataView = event.target.value;
     if (!value || value.byteLength === 0) return;
+    this.processHeartRateDataView(value);
+  }
 
+  private processHeartRateDataView(value: DataView): void {
     const flags = value.getUint8(0);
     const is16Bit = (flags & 0x01) !== 0;
     let offset = 1;
