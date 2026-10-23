@@ -1347,14 +1347,44 @@
             Direct millisecond R-R intervals (<span class="font-mono text-indigo-300">0x2A37</span>) from your Polar H7 or H10 without third-party cloud accounts.
           </p>
 
-          <button
-            type="button"
-            (click)="togglePolarConnection()"
-            [disabled]="bleHR.isConnecting()"
-            class="w-full py-3 px-4 rounded-2xl font-mono text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white shadow-lg shadow-indigo-950/50 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
-          >
-            {{ bleHR.isConnecting() ? 'SCANNING FOR POLAR STRAP...' : 'PAIR POLAR CHEST STRAP' }}
-          </button>
+          <!-- Proximity Searching Alert if paired previously -->
+          <div *ngIf="bleHR.autoReconnectEnabled() && bleHR.savedDeviceName()" class="p-3.5 rounded-2xl bg-indigo-950/40 border border-indigo-700/50 text-[11px] font-mono text-indigo-300 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-ping"></span>
+              <div>
+                <div class="font-bold text-white">PROXIMITY AUTO-CONNECT ACTIVE</div>
+                <div class="text-[10px] text-zinc-400">Silently reconnecting when {{ bleHR.savedDeviceName() }} is nearby...</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              (click)="bleHR.toggleAutoReconnect()"
+              class="text-[10px] px-2 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold"
+            >
+              ON
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              (click)="togglePolarConnection()"
+              [disabled]="bleHR.isConnecting()"
+              class="flex-1 py-3 px-4 rounded-2xl font-mono text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white shadow-lg shadow-indigo-950/50 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
+            >
+              {{ bleHR.isConnecting() ? 'SCANNING FOR POLAR STRAP...' : (bleHR.savedDeviceName() ? 'PAIR NEW POLAR STRAP' : 'PAIR POLAR CHEST STRAP') }}
+            </button>
+
+            <button
+              *ngIf="bleHR.savedDeviceName()"
+              type="button"
+              (click)="forgetPolarDevice()"
+              class="px-3 py-3 rounded-2xl border border-white/[0.08] hover:border-rose-500/40 text-zinc-400 hover:text-rose-400 font-mono text-xs transition-colors cursor-pointer"
+              title="Forget saved Polar strap"
+            >
+              FORGET
+            </button>
+          </div>
         </div>
 
         <!-- Connected State: Live Telemetry & Scans -->

@@ -343,6 +343,10 @@ export class DashboardComponent implements OnInit {
     }
   }
 
+  public async forgetPolarDevice(): Promise<void> {
+    await this.bleHR.forgetDevice();
+  }
+
   public startMorningReadinessScan(duration: number = 60): void {
     this.bleHR.startReadinessScan(duration);
   }

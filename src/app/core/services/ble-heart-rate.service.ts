@@ -123,6 +123,16 @@ export class BleHeartRateService {
   public readonly lastRRIntervalMs = signal<number | null>(null);
   public readonly errorMessage = signal<string | null>(null);
 
+  // Proximity auto-reconnect state
+  private readonly storageDeviceKey = 'vagus_last_ble_device_id';
+  private readonly storageDeviceNameKey = 'vagus_last_ble_device_name';
+  private readonly storageAutoReconnectKey = 'vagus_ble_auto_reconnect_enabled';
+  public readonly autoReconnectEnabled = signal<boolean>(true);
+  public readonly isSearchingProximity = signal<boolean>(false);
+  public readonly savedDeviceName = signal<string | null>(null);
+  private proximityWatchdogTimer: any = null;
+  private isScanningForProximity = false;
+
   private activeUserId = '';
 
   public setActiveUserId(uid: string): void {
@@ -224,7 +234,157 @@ export class BleHeartRateService {
   private workoutTimerInterval: any = null;
   private recoveryTimerInterval: any = null;
 
-  constructor() {}
+  constructor() {
+    this.restoreSavedDeviceContext();
+
+    // Re-check proximity whenever user opens or resumes the app
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && !this.isConnected()) {
+          this.attemptProximityReconnect().catch(() => {});
+        }
+      });
+    }
+
+    // Startup proximity sweep: If Polar H7 is already on chest, connect immediately
+    if (typeof window !== 'undefined') {
+      setTimeout(() => {
+        if (!this.isConnected() && this.autoReconnectEnabled()) {
+          this.attemptProximityReconnect().catch(() => {});
+        }
+      }, 1200);
+    }
+
+    // Proximity watchdog: silently polls for Polar H7 advertising packets in range
+    this.startProximityWatchdog();
+  }
+
+  private restoreSavedDeviceContext(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const savedId = localStorage.getItem(this.storageDeviceKey);
+      const savedName = localStorage.getItem(this.storageDeviceNameKey);
+      const autoEnabled = localStorage.getItem(this.storageAutoReconnectKey);
+
+      if (savedId) {
+        this.nativeDeviceId = savedId;
+        this.savedDeviceName.set(savedName || 'Polar H7 Chest Strap');
+      }
+      if (autoEnabled !== null) {
+        this.autoReconnectEnabled.set(autoEnabled === 'true');
+      }
+    } catch {}
+  }
+
+  private startProximityWatchdog(): void {
+    if (this.proximityWatchdogTimer) return;
+
+    // Check proximity every 6 seconds if disconnected and auto-reconnect is on
+    this.proximityWatchdogTimer = setInterval(async () => {
+      if (
+        !this.isConnected() &&
+        !this.isConnecting() &&
+        this.autoReconnectEnabled() &&
+        this.nativeDeviceId &&
+        Capacitor.isNativePlatform()
+      ) {
+        await this.attemptProximityReconnect();
+      }
+    }, 6000);
+  }
+
+  /**
+   * Silently attempt to reconnect to the known Polar H7 when it comes into proximity
+   */
+  public async attemptProximityReconnect(): Promise<boolean> {
+    if (this.isConnected() || this.isConnecting() || !this.autoReconnectEnabled()) {
+      return false;
+    }
+
+    const targetId =
+      this.nativeDeviceId ||
+      (typeof localStorage !== 'undefined' ? localStorage.getItem(this.storageDeviceKey) : null);
+
+    if (!targetId || !Capacitor.isNativePlatform()) {
+      return false;
+    }
+
+    try {
+      this.isSearchingProximity.set(true);
+      await BleClient.initialize();
+
+      const HEART_RATE_SERVICE = numberToUUID(0x180D);
+      const HEART_RATE_MEASUREMENT = numberToUUID(0x2A37);
+      const BATTERY_SERVICE = numberToUUID(0x180F);
+      const BATTERY_LEVEL = numberToUUID(0x2A19);
+
+      // Attempt to establish BLE link with 2500ms connection timeout
+      await BleClient.connect(
+        targetId,
+        (disconnectedId) => {
+          console.warn('[BleHeartRate] Device left proximity:', disconnectedId);
+          this.handleDisconnect();
+        },
+        { timeout: 2500 }
+      );
+
+      this.nativeDeviceId = targetId;
+      const name =
+        (typeof localStorage !== 'undefined' ? localStorage.getItem(this.storageDeviceNameKey) : null) ||
+        'Polar H7 Chest Strap';
+      this.deviceName.set(name);
+      this.savedDeviceName.set(name);
+
+      await BleClient.startNotifications(
+        targetId,
+        HEART_RATE_SERVICE,
+        HEART_RATE_MEASUREMENT,
+        (value: DataView) => {
+          this.processHeartRateDataView(value);
+        }
+      );
+
+      try {
+        const batteryVal = await BleClient.read(targetId, BATTERY_SERVICE, BATTERY_LEVEL);
+        if (batteryVal && batteryVal.byteLength > 0) {
+          this.batteryLevel.set(batteryVal.getUint8(0));
+        }
+      } catch {}
+
+      this.isConnected.set(true);
+      this.isConnecting.set(false);
+      this.isSearchingProximity.set(false);
+      console.info('[BleHeartRate] Proximity auto-connected to Polar H7:', targetId);
+      return true;
+    } catch {
+      // Device is out of proximity / not worn currently
+      this.isSearchingProximity.set(false);
+      return false;
+    }
+  }
+
+  public toggleAutoReconnect(): void {
+    const next = !this.autoReconnectEnabled();
+    this.autoReconnectEnabled.set(next);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(this.storageAutoReconnectKey, String(next));
+    }
+    if (next && !this.isConnected()) {
+      this.attemptProximityReconnect().catch(() => {});
+    }
+  }
+
+  public async forgetDevice(): Promise<void> {
+    await this.disconnect();
+    this.nativeDeviceId = null;
+    this.savedDeviceName.set(null);
+    this.autoReconnectEnabled.set(false);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(this.storageDeviceKey);
+      localStorage.removeItem(this.storageDeviceNameKey);
+      localStorage.setItem(this.storageAutoReconnectKey, 'false');
+    }
+  }
 
   /**
    * Pair with Polar chest strap or any standard Bluetooth LE Heart Rate monitor
@@ -256,7 +416,17 @@ export class BleHeartRateService {
         });
 
         this.nativeDeviceId = device.deviceId;
-        this.deviceName.set(device.name || 'Polar H7 Chest Strap');
+        const name = device.name || 'Polar H7 Chest Strap';
+        this.deviceName.set(name);
+        this.savedDeviceName.set(name);
+
+        // Persist device ID for permanent proximity auto-reconnect
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(this.storageDeviceKey, device.deviceId);
+          localStorage.setItem(this.storageDeviceNameKey, name);
+          localStorage.setItem(this.storageAutoReconnectKey, 'true');
+        }
+        this.autoReconnectEnabled.set(true);
 
         await BleClient.connect(device.deviceId, (deviceId) => {
           console.warn('[BleHeartRate] Device disconnected:', deviceId);
@@ -281,6 +451,7 @@ export class BleHeartRateService {
 
         this.isConnected.set(true);
         this.isConnecting.set(false);
+        this.isSearchingProximity.set(false);
         return true;
       }
 
@@ -345,7 +516,6 @@ export class BleHeartRateService {
       try {
         await BleClient.disconnect(this.nativeDeviceId);
       } catch {}
-      this.nativeDeviceId = null;
     } else if (this.gattServer && this.gattServer.connected) {
       this.gattServer.disconnect();
     }
