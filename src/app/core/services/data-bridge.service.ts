@@ -502,10 +502,13 @@ export class DataBridgeService {
     return cleanDay;
   }
 
+  private stepSyncTimer: any = null;
+  private lastSyncedSteps = 0;
+
   /**
    * Update live step count from phone pedometer / accelerometer sensor
    */
-  public async updateLiveSteps(userId: string, dateStr: string, steps: number): Promise<void> {
+  public updateLiveSteps(userId: string, dateStr: string, steps: number): void {
     const current = this.todayLogSubject.value;
     if (current) {
       current.biometrics.steps = steps;
@@ -513,11 +516,20 @@ export class DataBridgeService {
       this.saveToLocalStorage(userId, current);
     }
 
-    try {
-      const docRef = doc(this.firestore, `users/${userId}/daily_logs/${dateStr}`);
-      await setDoc(docRef, { biometrics: { steps } }, { merge: true });
-    } catch {
-      // Local fallback
+    // Debounce cloud write to every 3 seconds (or when step delta >= 10) so the UI stays 60 FPS silky smooth
+    if (!this.stepSyncTimer || Math.abs(steps - this.lastSyncedSteps) >= 10) {
+      if (this.stepSyncTimer) clearTimeout(this.stepSyncTimer);
+      this.stepSyncTimer = setTimeout(async () => {
+        try {
+          this.lastSyncedSteps = steps;
+          const docRef = doc(this.firestore, `users/${userId}/daily_logs/${dateStr}`);
+          await setDoc(docRef, { biometrics: { steps } }, { merge: true });
+        } catch {
+          // Local fallback
+        } finally {
+          this.stepSyncTimer = null;
+        }
+      }, 3000);
     }
   }
 

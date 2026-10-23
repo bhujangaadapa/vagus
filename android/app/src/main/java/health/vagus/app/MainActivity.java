@@ -30,6 +30,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
 
     private SensorManager sensorManager;
     private Sensor stepCounterSensor;
+    private Sensor stepDetectorSensor;
     private int lastRawHardwareSteps = 0;
 
     @Override
@@ -39,6 +40,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         if (sensorManager != null) {
             stepCounterSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
+            stepDetectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR);
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -52,9 +54,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     public void onResume() {
         super.onResume();
 
-        if (sensorManager != null && stepCounterSensor != null) {
-            sensorManager.registerListener(this, stepCounterSensor, SensorManager.SENSOR_DELAY_UI);
-        }
+        registerSensors();
 
         try {
             WebView webView = getBridge().getWebView();
@@ -78,6 +78,19 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
         } catch (Exception ignored) {}
     }
 
+    private void registerSensors() {
+        if (sensorManager != null) {
+            // STEP_DETECTOR provides immediate per-stride ticks (<100ms latency), exactly like StepUp
+            if (stepDetectorSensor != null) {
+                sensorManager.registerListener(this, stepDetectorSensor, SensorManager.SENSOR_DELAY_FASTEST, 0);
+            }
+            // STEP_COUNTER provides periodic ground-truth accumulator reconciliation
+            if (stepCounterSensor != null) {
+                sensorManager.registerListener(this, stepCounterSensor, SensorManager.SENSOR_DELAY_FASTEST, 0);
+            }
+        }
+    }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
@@ -88,7 +101,12 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (event.sensor.getType() == Sensor.TYPE_STEP_COUNTER) {
+        if (event.sensor.getType() == Sensor.TYPE_STEP_DETECTOR) {
+            // Instant real-time stride tick as you walk
+            int steps = incrementStep();
+            dispatchStepUpdate(steps);
+        } else if (event.sensor.getType() == Sensor.TYPE_STEP_COUNTER) {
+            // Low-power hardware accumulator
             int totalHardwareSteps = (int) event.values[0];
             this.lastRawHardwareSteps = totalHardwareSteps;
             int steps = processHardwareSteps(totalHardwareSteps);
@@ -98,6 +116,25 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+
+    /**
+     * Real-time increment on each detected footstrike
+     */
+    private synchronized int incrementStep() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String todayStr = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+        String savedDate = prefs.getString(KEY_DATE, "");
+        int storedSteps = 0;
+        if (todayStr.equals(savedDate)) {
+            storedSteps = prefs.getInt(KEY_STORED_STEPS, 0);
+        }
+        storedSteps++;
+        prefs.edit()
+            .putString(KEY_DATE, todayStr)
+            .putInt(KEY_STORED_STEPS, storedSteps)
+            .apply();
+        return storedSteps;
+    }
 
     /**
      * Strictly monotonic daily footsteps: steps can only increase or remain constant on same calendar day
@@ -189,9 +226,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_REQ_CODE && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            if (sensorManager != null && stepCounterSensor != null) {
-                sensorManager.registerListener(this, stepCounterSensor, SensorManager.SENSOR_DELAY_UI);
-            }
+            registerSensors();
         }
     }
 
@@ -203,7 +238,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
 
         @JavascriptInterface
         public boolean isSensorAvailable() {
-            return stepCounterSensor != null;
+            return stepCounterSensor != null || stepDetectorSensor != null;
         }
 
         @JavascriptInterface

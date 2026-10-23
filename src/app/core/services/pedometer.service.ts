@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject, signal, NgZone } from '@angular/core';
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { CapacitorPedometer, Measurement } from '@capgo/capacitor-pedometer';
 import { HealthFitness } from '@capacitor/health-fitness';
@@ -15,6 +15,7 @@ export type SensorEngine =
 })
 export class PedometerService {
   private readonly dataBridge = inject(DataBridgeService);
+  private readonly ngZone = inject(NgZone);
 
   // Reactive state signals
   public readonly isTracking = signal<boolean>(false);
@@ -46,12 +47,18 @@ export class PedometerService {
     this.detectOperatingSystem();
     this.restorePersistedStepCount();
 
-    // Listen to today's log to reconcile counts
+    // Listen to today's log to reconcile counts and calibrate native hardware baseline
     this.dataBridge.todayLog$.subscribe((log) => {
       if (log && log.biometrics && typeof log.biometrics.steps === 'number') {
-        if (log.biometrics.steps > this.currentSteps()) {
-          this.currentSteps.set(log.biometrics.steps);
-          this.persistStepCount(log.biometrics.steps);
+        const cloudSteps = log.biometrics.steps;
+        if (cloudSteps > this.currentSteps()) {
+          this.currentSteps.set(cloudSteps);
+          this.persistStepCount(cloudSteps);
+
+          const bridge = typeof window !== 'undefined' ? (window as any).AndroidHardwarePedometer : null;
+          if (bridge && typeof bridge.setInitialBaseline === 'function') {
+            bridge.setInitialBaseline(cloudSteps);
+          }
         }
       }
     });
@@ -71,13 +78,23 @@ export class PedometerService {
         if (event && event.detail && typeof event.detail.steps === 'number') {
           const steps = event.detail.steps;
           if (steps > 0 && steps >= this.currentSteps()) {
-            this.currentSteps.set(steps);
-            this.persistStepCount(steps);
-            this.dataBridge.updateLiveSteps(this.currentUserId, this.currentDateStr, steps);
-            this.activeEngine.set('ANDROID_HARDWARE_PEDOMETER');
-            this.isTracking.set(true);
-            this.permissionState.set('GRANTED');
-            this.statusMessage.set('Hardware Step Sensor: Active');
+            this.ngZone.run(() => {
+              this.currentSteps.set(steps);
+              this.persistStepCount(steps);
+
+              // Real-time cadence calculation
+              const now = performance.now();
+              this.recentStepTimes.push(now);
+              this.recentStepTimes = this.recentStepTimes.filter((t) => now - t <= 5000);
+              const cadence = Math.round((this.recentStepTimes.length / 5) * 60);
+              this.activeCadence.set(cadence);
+
+              this.dataBridge.updateLiveSteps(this.currentUserId, this.currentDateStr, steps);
+              this.activeEngine.set('ANDROID_HARDWARE_PEDOMETER');
+              this.isTracking.set(true);
+              this.permissionState.set('GRANTED');
+              this.statusMessage.set('Hardware Step Sensor: Live');
+            });
           }
         }
       });
@@ -88,18 +105,21 @@ export class PedometerService {
 
     // Check hardware bridge and Health Connect with short delays in case WebView interface attaches right after bundle evaluation
     if (typeof window !== 'undefined') {
-      [400, 1500, 3500].forEach((delay) => {
+      [300, 800, 2000].forEach((delay) => {
         setTimeout(() => {
           const b = (window as any).AndroidHardwarePedometer;
           if (b && typeof b.getLiveSteps === 'function') {
             const steps = b.getLiveSteps();
-            if (steps > 0 && steps >= this.currentSteps()) {
+            if (steps > 0 && steps > this.currentSteps()) {
               this.currentSteps.set(steps);
               this.persistStepCount(steps);
               this.dataBridge.updateLiveSteps(this.currentUserId, this.currentDateStr, steps);
               this.activeEngine.set('ANDROID_HARDWARE_PEDOMETER');
               this.isTracking.set(true);
               this.permissionState.set('GRANTED');
+            } else if (this.currentSteps() > 0 && steps === 0 && typeof b.setInitialBaseline === 'function') {
+              // Synchronize native baseline with restored steps
+              b.setInitialBaseline(this.currentSteps());
             }
           }
           if (Capacitor.isNativePlatform()) {
@@ -538,6 +558,10 @@ export class PedometerService {
         const data = JSON.parse(raw);
         if (data.date === this.currentDateStr && typeof data.steps === 'number') {
           this.currentSteps.set(data.steps);
+          const bridge = typeof window !== 'undefined' ? (window as any).AndroidHardwarePedometer : null;
+          if (bridge && typeof bridge.setInitialBaseline === 'function') {
+            bridge.setInitialBaseline(data.steps);
+          }
         } else if (data.date !== this.currentDateStr) {
           // Midnight has passed: automatically start today's fresh counter at 0
           this.currentSteps.set(0);
