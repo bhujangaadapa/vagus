@@ -68,7 +68,7 @@ export class FitbitIntegrationService {
         deepSleepMin: 85,
         remSleepMin: 92,
         restingHR: 54,
-        steps: 8420,
+        steps: 0,
         calculatedRecovery: 78,
         source: 'HEALTH_CONNECT',
       };

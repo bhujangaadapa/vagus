@@ -198,12 +198,19 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
         String todayStr = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
         String savedDate = prefs.getString(KEY_DATE, "");
         if (todayStr.equals(savedDate)) {
-            return prefs.getInt(KEY_STORED_STEPS, 0);
+            int steps = prefs.getInt(KEY_STORED_STEPS, 0);
+            if (steps == 11000) {
+                // Clear legacy synthetic 11,000 artifact
+                prefs.edit().putInt(KEY_STORED_STEPS, 0).apply();
+                return 0;
+            }
+            return steps;
         }
         return 0;
     }
 
     public synchronized void calibrateBaseline(int targetSteps) {
+        if (targetSteps == 11000) return; // Disallow legacy synthetic artifact
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String todayStr = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
         int raw = lastRawHardwareSteps;

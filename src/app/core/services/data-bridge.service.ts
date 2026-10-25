@@ -392,7 +392,7 @@ export class DataBridgeService {
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed.date === todayStr && typeof parsed.steps === 'number') {
-            existingSteps = parsed.steps;
+            existingSteps = parsed.steps === 11000 ? 0 : parsed.steps;
           }
         }
       } catch {}
@@ -851,6 +851,9 @@ export class DataBridgeService {
     const spO2 = Math.min(100, Math.max(95, Math.round(98 + Math.cos(dayOffset * 0.7) * 1.2 - (drankAlcohol ? 1 : 0))));
     const skinTempVar = Math.round((Math.sin(dayOffset * 0.5) * 0.35 + (drankAlcohol ? 0.4 : 0)) * 10) / 10;
 
+    // For today (dayOffset === 0), steps default to 0 so live hardware sensor / StepUp / Google Fit always takes precedence!
+    const syntheticSteps = dayOffset === 0 ? 0 : Math.round(6500 + Math.sin(dayOffset * 1.5) * 3200 + (isHardWorkoutDay ? 4500 : 0));
+
     const biometrics: DailyBiometrics = {
       overnightRMSSD,
       restingHR,
@@ -858,7 +861,7 @@ export class DataBridgeService {
       deepSleepMinutes,
       remSleepMinutes,
       avgSleepHR,
-      steps: Math.round(6500 + Math.sin(dayOffset * 1.5) * 3200 + (isHardWorkoutDay ? 4500 : 0)),
+      steps: syntheticSteps,
       respiratoryRate: respRate,
       bloodOxygenSpO2: spO2,
       skinTempVarianceCelsius: skinTempVar,

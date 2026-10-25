@@ -58,6 +58,12 @@ export class PedometerService {
     this.dataBridge.todayLog$.subscribe((log) => {
       if (log && log.biometrics && typeof log.biometrics.steps === 'number') {
         const cloudSteps = log.biometrics.steps;
+        if (cloudSteps === 11000) {
+          // Synthetic 11,000 legacy artifact detected: reset it to actual live steps
+          log.biometrics.steps = this.currentSteps();
+          this.dataBridge.updateLiveSteps(this.currentUserId, this.currentDateStr, this.currentSteps());
+          return;
+        }
         if (cloudSteps > this.currentSteps()) {
           this.currentSteps.set(cloudSteps);
           this.persistStepCount(cloudSteps);
@@ -84,7 +90,7 @@ export class PedometerService {
       window.addEventListener('androidHardwareStep', (event: any) => {
         if (event && event.detail && typeof event.detail.steps === 'number') {
           const steps = event.detail.steps;
-          if (steps > 0 && steps >= this.currentSteps()) {
+          if (steps > 0 && (steps >= this.currentSteps() || this.currentSteps() === 11000)) {
             this.ngZone.run(() => {
               this.currentSteps.set(steps);
               this.persistStepCount(steps);
@@ -117,14 +123,14 @@ export class PedometerService {
           const b = (window as any).AndroidHardwarePedometer;
           if (b && typeof b.getLiveSteps === 'function') {
             const steps = b.getLiveSteps();
-            if (steps > 0 && steps > this.currentSteps()) {
+            if (steps > 0 && (steps > this.currentSteps() || this.currentSteps() === 11000)) {
               this.currentSteps.set(steps);
               this.persistStepCount(steps);
               this.dataBridge.updateLiveSteps(this.currentUserId, this.currentDateStr, steps);
               this.activeEngine.set('ANDROID_HARDWARE_PEDOMETER');
               this.isTracking.set(true);
               this.permissionState.set('GRANTED');
-            } else if (this.currentSteps() > 0 && steps === 0 && typeof b.setInitialBaseline === 'function') {
+            } else if (this.currentSteps() > 0 && this.currentSteps() !== 11000 && steps === 0 && typeof b.setInitialBaseline === 'function') {
               // Synchronize native baseline with restored steps
               b.setInitialBaseline(this.currentSteps());
             }
@@ -169,7 +175,7 @@ export class PedometerService {
     const bridge = typeof window !== 'undefined' ? (window as any).AndroidHardwarePedometer : null;
     if (bridge && typeof bridge.getLiveSteps === 'function') {
       const steps = bridge.getLiveSteps();
-      if (steps > 0 && steps >= this.currentSteps()) {
+      if (steps > 0 && (steps >= this.currentSteps() || this.currentSteps() === 11000)) {
         this.currentSteps.set(steps);
         this.persistStepCount(steps);
         this.dataBridge.updateLiveSteps(this.currentUserId, this.currentDateStr, steps);
@@ -423,7 +429,7 @@ export class PedometerService {
     const bridge = typeof window !== 'undefined' ? (window as any).AndroidHardwarePedometer : null;
     if (bridge && typeof bridge.getLiveSteps === 'function') {
       const steps = bridge.getLiveSteps();
-      if (steps > 0 && steps >= this.currentSteps()) {
+      if (steps > 0 && (steps >= this.currentSteps() || this.currentSteps() === 11000)) {
         this.currentSteps.set(steps);
         this.persistStepCount(steps);
         this.dataBridge.updateLiveSteps(this.currentUserId, this.currentDateStr, steps);
@@ -523,7 +529,7 @@ export class PedometerService {
           if (typeof val === 'number') totalSteps = Math.round(val);
         }
 
-        if (totalSteps > 0 && totalSteps >= this.currentSteps()) {
+        if (totalSteps > 0 && (totalSteps >= this.currentSteps() || this.currentSteps() === 11000)) {
           console.info(`[PedometerService] Auto-synced ${totalSteps} steps from Health Connect / StepUp`);
           this.currentSteps.set(totalSteps);
           this.persistStepCount(totalSteps);
@@ -565,6 +571,10 @@ export class PedometerService {
         const data = JSON.parse(raw);
         const todayStr = this.getLocalDateStr();
         if (data && (data.date === todayStr || data.date === this.currentDateStr) && typeof data.steps === 'number') {
+          // If stored steps was exactly the legacy synthetic 11,000, ignore it
+          if (data.steps === 11000) {
+            return 0;
+          }
           return data.steps;
         }
       }
@@ -580,11 +590,16 @@ export class PedometerService {
       if (raw) {
         const data = JSON.parse(raw);
         if (data.date === this.currentDateStr && typeof data.steps === 'number') {
-          if (data.steps > this.currentSteps()) {
+          // Purge legacy 11,000 artifact
+          if (data.steps === 11000) {
+            data.steps = 0;
+            this.persistStepCount(0);
+          }
+          if (data.steps > this.currentSteps() && data.steps !== 11000) {
             this.currentSteps.set(data.steps);
           }
           const bridge = typeof window !== 'undefined' ? (window as any).AndroidHardwarePedometer : null;
-          if (bridge && typeof bridge.setInitialBaseline === 'function') {
+          if (bridge && typeof bridge.setInitialBaseline === 'function' && data.steps !== 11000) {
             bridge.setInitialBaseline(data.steps);
           }
         }
@@ -597,10 +612,12 @@ export class PedometerService {
    * Math.max(stepUpSteps, healthConnectSteps, firebaseSteps, fitbitSteps, localCachedSteps)
    */
   public reconcileSteps(firebaseSteps: number = 0, fitbitSteps: number = 0): number {
-    const current = this.currentSteps();
+    const current = this.currentSteps() === 11000 ? 0 : this.currentSteps();
     const stored = this.getStoredStepsForToday();
-    const highest = Math.max(current, stored, firebaseSteps, fitbitSteps);
-    if (highest > current) {
+    const cleanFb = firebaseSteps === 11000 ? 0 : firebaseSteps;
+    const cleanFitbit = fitbitSteps === 11000 || fitbitSteps === 8420 ? 0 : fitbitSteps;
+    const highest = Math.max(current, stored, cleanFb, cleanFitbit);
+    if (highest > this.currentSteps() || this.currentSteps() === 11000) {
       this.currentSteps.set(highest);
       this.persistStepCount(highest);
     }

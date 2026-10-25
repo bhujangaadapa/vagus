@@ -62,9 +62,11 @@ export class DashboardComponent implements OnInit {
     return this.authService.userProfile()?.settings?.dailyStepGoal || 10000;
   });
   public readonly liveSteps = computed(() => {
-    const pSteps = this.pedometer.currentSteps();
-    const fbSteps = this.todayLog()?.biometrics?.steps ?? 0;
-    const fitbitSteps = this.fitbit.lastImport()?.steps ?? 0;
+    const pSteps = this.pedometer.currentSteps() === 11000 ? 0 : this.pedometer.currentSteps();
+    let fbSteps = this.todayLog()?.biometrics?.steps ?? 0;
+    if (fbSteps === 11000) fbSteps = 0; // Filter legacy synthetic 11,000
+    let fitbitSteps = this.fitbit.lastImport()?.steps ?? 0;
+    if (fitbitSteps === 11000 || fitbitSteps === 8420) fitbitSteps = 0;
     const localSteps = this.pedometer.getStoredStepsForToday();
     return Math.max(pSteps, fbSteps, fitbitSteps, localSteps, 0);
   });
