@@ -243,6 +243,107 @@ export class DashboardComponent implements OnInit {
     return Math.min(100, Math.round((logged / need) * 100));
   });
 
+  // WHOOP 3-Dial Mini Gauges (Radius 38, Circumference ~238.76)
+  public readonly dialRadius = 38;
+  public readonly dialCircumference = 2 * Math.PI * 38;
+
+  public readonly sleepStrokeOffset = computed(() => {
+    const pct = Math.min(100, Math.max(0, this.sleepPerformancePercent()));
+    return this.dialCircumference * (1 - pct / 100);
+  });
+
+  public readonly recoveryStrokeOffset = computed(() => {
+    const score = Math.min(100, Math.max(0, this.recoveryScore()));
+    return this.dialCircumference * (1 - score / 100);
+  });
+
+  public readonly strainStrokeOffset = computed(() => {
+    // WHOOP Strain is 0 to 21
+    const s = Math.min(21, Math.max(0, this.strainScore()));
+    return this.dialCircumference * (1 - s / 21);
+  });
+
+  // WHOOP Top Date Selector & Battery
+  public readonly selectedDayOffset = signal<number>(0);
+  public readonly isViewingToday = computed(() => this.selectedDayOffset() === 0);
+  public readonly activeDisplayDateLabel = computed(() => {
+    const offset = this.selectedDayOffset();
+    if (offset === 0) return 'TODAY';
+    if (offset === -1) return 'YESTERDAY';
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+  });
+
+  public readonly strapBatteryLevel = computed(() => {
+    return this.bleHR.isConnected() ? 92 : 54;
+  });
+
+  // WHOOP Health & Stress Monitor status
+  public readonly allVitalsNormal = computed(() => {
+    const v = this.keyVitals();
+    return (
+      v.hrv.status === 'TYPICAL' &&
+      v.rhr.status === 'TYPICAL' &&
+      v.respiratoryRate.status === 'TYPICAL' &&
+      v.bloodOxygen.status === 'TYPICAL' &&
+      v.skinTemp.status === 'TYPICAL'
+    );
+  });
+
+  public readonly currentStressScore = computed(() => {
+    const rhr = this.todayLog()?.biometrics?.restingHR || 58;
+    const liveHr = this.bleHR.liveBpm() || rhr;
+    const ratio = Math.max(0, (liveHr - rhr) / Math.max(20, this.calibratedMaxHR() - rhr));
+    const stress = Math.min(3.0, Math.max(0.4, Math.round((1.0 + ratio * 1.5) * 10) / 10));
+    return stress.toFixed(1);
+  });
+
+  public readonly currentStressLabel = computed(() => {
+    const s = parseFloat(this.currentStressScore());
+    if (s < 1.0) return 'LOW';
+    if (s <= 2.0) return 'MEDIUM';
+    return 'HIGH';
+  });
+
+  public readonly currentFormattedTime = signal<string>(
+    new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  );
+
+  public readonly showDailyOutlook = signal<boolean>(false);
+  public toggleDailyOutlook(): void {
+    this.showDailyOutlook.set(!this.showDailyOutlook());
+  }
+
+  public goToPreviousDay(): void {
+    const logs = this.historyLogs();
+    const minOffset = -Math.max(1, logs.length - 1);
+    if (this.selectedDayOffset() > minOffset) {
+      this.selectedDayOffset.update((o) => o - 1);
+      this.syncDisplayLogForOffset();
+    }
+  }
+
+  public goToNextDay(): void {
+    if (this.selectedDayOffset() < 0) {
+      this.selectedDayOffset.update((o) => o + 1);
+      this.syncDisplayLogForOffset();
+    }
+  }
+
+  private syncDisplayLogForOffset(): void {
+    const offset = this.selectedDayOffset();
+    const logs = this.historyLogs();
+    if (offset === 0) {
+      if (logs.length > 0) this.todayLog.set(logs[logs.length - 1]);
+    } else {
+      const idx = logs.length - 1 + offset;
+      if (idx >= 0 && idx < logs.length) {
+        this.todayLog.set(logs[idx]);
+      }
+    }
+  }
+
   // 7-day recent logs for trend view
   public readonly recentLogs = computed(() => {
     const logs = this.historyLogs();

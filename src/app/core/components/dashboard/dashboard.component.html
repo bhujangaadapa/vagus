@@ -1,124 +1,58 @@
-<div class="min-h-screen bg-[#06070a] text-slate-100 flex flex-col justify-start max-w-md mx-auto shadow-2xl border-x border-white/[0.06] font-sans pb-16">
+<div class="min-h-screen bg-[#0a0d14] text-slate-100 flex flex-col justify-start max-w-md mx-auto shadow-2xl border-x border-white/[0.06] font-sans pb-28">
   
-  <!-- 1. WHOOP Header Bar: Athlete Identity & Sync Status -->
-  <header class="px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between bg-[#06070a]/90 backdrop-blur-xl sticky top-0 z-30">
-    <div class="flex items-center gap-2.5">
-      <!-- Live Status Orb -->
-      <div class="relative flex items-center justify-center">
-        <span class="w-2.5 h-2.5 rounded-full" [ngClass]="recoveryColor().stroke === '#00F5A0' ? 'bg-[#00F5A0] shadow-[0_0_8px_#00F5A0]' : (recoveryColor().stroke === '#FFB800' ? 'bg-[#FFB800] shadow-[0_0_8px_#FFB800]' : 'bg-[#FF334B] shadow-[0_0_8px_#FF334B]')"></span>
-      </div>
-      <div>
-        <div class="flex items-center gap-2">
-          <span class="font-mono text-xs font-bold tracking-wider text-white">VAGUS</span>
-          <span class="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-white/[0.06] text-zinc-400 border border-white/[0.08]">
-            {{ todayLog()?.date || 'TODAY' }}
-          </span>
-        </div>
-      </div>
+  <!-- 1. WHOOP Signature Top Bar (Avatar, < TODAY >, Battery Indicator) -->
+  <header class="px-5 py-3 flex items-center justify-between bg-[#0a0d14]/95 backdrop-blur-xl sticky top-0 z-30">
+    <!-- Left: Profile Avatar -->
+    <button
+      type="button"
+      (click)="openProfileModal()"
+      class="w-8 h-8 rounded-full border border-white/20 hover:border-white/50 flex items-center justify-center text-zinc-300 hover:text-white transition-all cursor-pointer"
+      title="Athlete Profile & Biometrics"
+    >
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+    </button>
+
+    <!-- Center: Date Navigation Pill (< TODAY >) -->
+    <div class="flex items-center gap-1.5 bg-[#1b2029] px-3.5 py-1.5 rounded-full text-xs font-bold text-white shadow-inner border border-white/[0.06]">
+      <button
+        type="button"
+        (click)="goToPreviousDay()"
+        class="w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer text-sm font-bold"
+        title="Previous Day"
+      >
+        ‹
+      </button>
+
+      <span class="px-1 text-[11px] font-mono tracking-wider font-bold">
+        {{ activeDisplayDateLabel() }}
+      </span>
+
+      <button
+        type="button"
+        (click)="goToNextDay()"
+        [disabled]="isViewingToday()"
+        class="w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+        title="Next Day"
+      >
+        ›
+      </button>
     </div>
 
-    <!-- Quick Actions Pill & Hardware Status -->
-    <div class="flex items-center gap-2">
-      <!-- Polar BLE Status Chip -->
-      <button
-        type="button"
-        (click)="setPillar('sensors'); setHardwareTab('polar')"
-        class="text-[10px] font-mono px-2 py-0.8 rounded-full border transition-all flex items-center gap-1.5 cursor-pointer"
-        [ngClass]="bleHR.isConnected() ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-300' : 'bg-white/[0.04] border-white/[0.08] text-zinc-400 hover:text-white'"
-      >
-        <span class="w-1.5 h-1.5 rounded-full" [ngClass]="bleHR.isConnected() ? 'bg-indigo-400 animate-pulse' : 'bg-zinc-600'"></span>
-        <span>{{ bleHR.isConnected() ? 'H7 ' + bleHR.liveBpm() + ' BPM' : 'SENSORS' }}</span>
-      </button>
-
-      <!-- Athlete Demographics / Settings Cog -->
-      <button
-        type="button"
-        (click)="openProfileModal()"
-        class="w-7 h-7 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] flex items-center justify-center text-zinc-300 hover:text-white transition-colors cursor-pointer"
-        title="Athlete Profile & Biometrics Settings"
-      >
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      </button>
+    <!-- Right: Strap Battery Level with Indicator -->
+    <div
+      (click)="setPillar('sensors')"
+      class="flex items-center gap-1.5 text-xs font-semibold text-zinc-300 cursor-pointer hover:text-white transition-colors"
+      title="Strap Battery & Sensors"
+    >
+      <span class="font-mono text-xs font-bold">{{ strapBatteryLevel() }}%</span>
+      <div class="relative w-3.5 h-5 rounded-[4px] border border-zinc-400 p-[1.5px] flex items-end">
+        <div class="w-full bg-zinc-300 rounded-[1.5px]" [style.height.%]="strapBatteryLevel()"></div>
+        <div class="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-[#00F5A0] shadow-[0_0_4px_#00F5A0]"></div>
+      </div>
     </div>
   </header>
-
-  <!-- 2. Authenticated Athlete Profile & Cloud Sync Strip -->
-  <section class="px-5 py-2.5 bg-gradient-to-r from-white/[0.02] to-transparent border-b border-white/[0.05] flex items-center justify-between text-[11px] font-mono">
-    <div *ngIf="authService.currentUser() as user" class="flex items-center gap-2 truncate">
-      <div class="w-5 h-5 rounded-full bg-white/[0.08] border border-white/[0.1] flex items-center justify-center text-[10px] text-[#00F5A0] font-bold">
-        {{ (user.displayName || user.email || 'A').charAt(0).toUpperCase() }}
-      </div>
-      <span class="text-zinc-200 font-semibold truncate max-w-[140px]">{{ user.displayName || user.email }}</span>
-      <span class="text-zinc-600">•</span>
-      <button (click)="openProfileModal()" class="text-cyan-400 hover:underline">
-        {{ athleteDemographics().age }}y / {{ athleteDemographics().weightKg }}kg
-      </button>
-    </div>
-
-    <!-- Sign Out Button -->
-    <div class="flex items-center gap-1.5 shrink-0">
-      <button
-        type="button"
-        (click)="logout()"
-        class="text-[9px] font-mono text-zinc-400 hover:text-rose-400 px-2 py-0.8 rounded-lg bg-white/[0.04] border border-white/[0.06] transition-colors cursor-pointer"
-      >
-        LOGOUT
-      </button>
-    </div>
-  </section>
-
-  <!-- 3. WHOOP 4.0 Signature Segmented Navigation Bar -->
-  <nav class="px-5 pt-3 pb-2 sticky top-[57px] z-20 bg-[#06070a]/95 backdrop-blur-md">
-    <div class="p-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-between text-[11px] font-mono tracking-wider font-semibold">
-      <button
-        type="button"
-        (click)="setPillar('overview')"
-        class="flex-1 py-1.5 rounded-xl transition-all text-center cursor-pointer"
-        [ngClass]="activePillar() === 'overview' ? 'bg-white/[0.12] text-white shadow-sm font-bold border border-white/[0.1]' : 'text-zinc-400 hover:text-zinc-200'"
-      >
-        OVERVIEW
-      </button>
-
-      <button
-        type="button"
-        (click)="setPillar('recovery')"
-        class="flex-1 py-1.5 rounded-xl transition-all text-center cursor-pointer flex items-center justify-center gap-1"
-        [ngClass]="activePillar() === 'recovery' ? 'bg-[#00F5A0]/20 text-[#00F5A0] shadow-sm font-bold border border-[#00F5A0]/40' : 'text-zinc-400 hover:text-zinc-200'"
-      >
-        <span>RECOVERY</span>
-      </button>
-
-      <button
-        type="button"
-        (click)="setPillar('strain')"
-        class="flex-1 py-1.5 rounded-xl transition-all text-center cursor-pointer flex items-center justify-center gap-1"
-        [ngClass]="activePillar() === 'strain' ? 'bg-cyan-500/20 text-cyan-300 shadow-sm font-bold border border-cyan-500/40' : 'text-zinc-400 hover:text-zinc-200'"
-      >
-        <span>STRAIN</span>
-      </button>
-
-      <button
-        type="button"
-        (click)="setPillar('sleep')"
-        class="flex-1 py-1.5 rounded-xl transition-all text-center cursor-pointer flex items-center justify-center gap-1"
-        [ngClass]="activePillar() === 'sleep' ? 'bg-indigo-500/20 text-indigo-300 shadow-sm font-bold border border-indigo-500/40' : 'text-zinc-400 hover:text-zinc-200'"
-      >
-        <span>SLEEP</span>
-      </button>
-
-      <button
-        type="button"
-        (click)="setPillar('sensors')"
-        class="flex-1 py-1.5 rounded-xl transition-all text-center cursor-pointer flex items-center justify-center gap-1"
-        [ngClass]="activePillar() === 'sensors' ? 'bg-amber-500/20 text-amber-300 shadow-sm font-bold border border-amber-500/40' : 'text-zinc-400 hover:text-zinc-200'"
-      >
-        <span>SENSORS</span>
-      </button>
-    </div>
-  </nav>
 
   <!-- 4. Main Scrollable Telemetry Viewport -->
   <main class="flex-1 px-5 pt-2 pb-6 space-y-5 overflow-y-auto">
@@ -128,86 +62,232 @@
     <!-- ================================================================= -->
     <div *ngIf="activePillar() === 'overview'" class="space-y-5">
 
-      <!-- THE HERO RECOVERY DIAL (SIGNATURE WHOOP 4.0 RING) -->
-      <section class="whoop-surface p-6 rounded-3xl relative overflow-hidden flex flex-col items-center justify-center text-center">
-        <!-- Soft Ambient Radial Glow Behind Ring -->
+      <!-- Stylized WHOOP Logo Centered -->
+      <div class="flex items-center justify-center pt-1 pb-1 tracking-[0.25em] font-sans font-black text-xl text-white">
+        <span class="font-mono text-zinc-300">\\V/</span><span class="tracking-[0.25em] font-extrabold ml-1.5">HOOP</span>
+      </div>
+
+      <!-- THE THREE SIGNATURE WHOOP CIRCULAR DIALS (SLEEP, RECOVERY, STRAIN) -->
+      <section class="grid grid-cols-3 gap-2 px-1 pt-1 pb-1">
+        <!-- DIAL 1: SLEEP -->
         <div
-          class="absolute -top-12 w-64 h-64 rounded-full pointer-events-none opacity-20 blur-3xl transition-colors duration-1000"
-          [style.background]="recoveryColor().stroke"
-        ></div>
+          (click)="setPillar('sleep')"
+          class="flex flex-col items-center justify-center cursor-pointer group transition-transform active:scale-95"
+        >
+          <div class="relative w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center">
+            <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
+              <circle
+                cx="50"
+                cy="50"
+                r="38"
+                stroke="rgba(255, 255, 255, 0.08)"
+                stroke-width="7"
+                fill="transparent"
+              />
+              <circle
+                cx="50"
+                cy="50"
+                r="38"
+                stroke="#38bdf8"
+                stroke-width="7"
+                stroke-linecap="round"
+                fill="transparent"
+                [style.strokeDasharray]="dialCircumference"
+                [style.strokeDashoffset]="sleepStrokeOffset()"
+                class="transition-all duration-1000 ease-out"
+                style="filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.45));"
+              />
+            </svg>
 
-        <!-- Metric Header -->
-        <div class="flex items-center justify-between w-full mb-3 text-[10px] font-mono tracking-widest text-zinc-400 uppercase">
-          <span>DAILY RECOVERY</span>
-          <span class="px-2 py-0.5 rounded-full font-bold border" [ngClass]="recoveryColor().bg + ' ' + recoveryColor().text + ' ' + recoveryColor().border">
-            {{ recoveryColor().zone }}
-          </span>
-        </div>
-
-        <!-- The Radial Gauge -->
-        <div class="relative w-52 h-52 flex items-center justify-center my-1">
-          <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 190 190">
-            <!-- Background Inactive Track -->
-            <circle
-              cx="95"
-              cy="95"
-              r="80"
-              stroke="rgba(255, 255, 255, 0.08)"
-              stroke-width="12"
-              fill="transparent"
-            />
-            <!-- Active Illuminated Recovery Arc -->
-            <circle
-              cx="95"
-              cy="95"
-              r="80"
-              [attr.stroke]="recoveryColor().stroke"
-              stroke-width="12"
-              stroke-linecap="round"
-              fill="transparent"
-              [style.strokeDasharray]="circumference"
-              [style.strokeDashoffset]="strokeDashoffset()"
-              class="transition-all duration-1000 ease-out"
-              [style.filter]="'drop-shadow(0 0 12px ' + recoveryColor().glow + ')'"
-            />
-          </svg>
-
-          <!-- Centered Hero Score -->
-          <div class="absolute flex flex-col items-center justify-center">
-            <div class="flex items-baseline">
-              <span class="text-6xl font-sans font-black tracking-tight" [ngClass]="recoveryColor().text">
-                {{ recoveryScore() }}
+            <div class="absolute flex flex-col items-center justify-center">
+              <span class="text-xl sm:text-2xl font-black text-white font-sans tracking-tight">
+                {{ sleepPerformancePercent() }}%
               </span>
-              <span class="text-2xl font-light text-zinc-400 ml-0.5">%</span>
             </div>
-            <span class="text-[10px] font-mono tracking-[0.2em] uppercase font-bold text-zinc-400 mt-1">
-              {{ recoveryStatusText() }}
-            </span>
+          </div>
+
+          <div class="flex items-center gap-1 mt-2 text-[11px] font-bold tracking-wider text-zinc-300 group-hover:text-white uppercase font-sans">
+            <span>SLEEP</span>
+            <span class="text-zinc-500 group-hover:text-zinc-300 text-xs font-bold">›</span>
           </div>
         </div>
 
-        <!-- Nocturnal Vitals Strip (RMSSD, RHR, SLEEP) -->
-        <div class="grid grid-cols-3 w-full mt-4 pt-4 border-t border-white/[0.06] text-center font-mono">
-          <div class="cursor-pointer hover:bg-white/[0.02] rounded-xl py-1 transition-colors" (click)="setPillar('recovery')">
-            <div class="text-[9px] text-zinc-500 uppercase tracking-widest font-semibold">RMSSD (HRV)</div>
-            <div class="text-white font-bold text-base mt-0.5">
-              {{ todayLog()?.biometrics?.overnightRMSSD || 0 }} <span class="text-[10px] text-zinc-400 font-normal">ms</span>
+        <!-- DIAL 2: RECOVERY -->
+        <div
+          (click)="setPillar('recovery')"
+          class="flex flex-col items-center justify-center cursor-pointer group transition-transform active:scale-95"
+        >
+          <div class="relative w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center">
+            <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
+              <circle
+                cx="50"
+                cy="50"
+                r="38"
+                stroke="rgba(255, 255, 255, 0.08)"
+                stroke-width="7"
+                fill="transparent"
+              />
+              <circle
+                cx="50"
+                cy="50"
+                r="38"
+                [attr.stroke]="recoveryColor().stroke"
+                stroke-width="7"
+                stroke-linecap="round"
+                fill="transparent"
+                [style.strokeDasharray]="dialCircumference"
+                [style.strokeDashoffset]="recoveryStrokeOffset()"
+                class="transition-all duration-1000 ease-out"
+                [style.filter]="'drop-shadow(0 0 8px ' + recoveryColor().glow + ')'"
+              />
+            </svg>
+
+            <div class="absolute flex flex-col items-center justify-center">
+              <span class="text-xl sm:text-2xl font-black text-white font-sans tracking-tight">
+                {{ recoveryScore() }}%
+              </span>
             </div>
           </div>
 
-          <div class="border-x border-white/[0.06] cursor-pointer hover:bg-white/[0.02] rounded-xl py-1 transition-colors" (click)="setPillar('recovery')">
-            <div class="text-[9px] text-zinc-500 uppercase tracking-widest font-semibold">RESTING HR</div>
-            <div class="text-white font-bold text-base mt-0.5">
-              {{ todayLog()?.biometrics?.restingHR || 0 }} <span class="text-[10px] text-zinc-400 font-normal">bpm</span>
+          <div class="flex items-center gap-1 mt-2 text-[11px] font-bold tracking-wider text-zinc-300 group-hover:text-white uppercase font-sans">
+            <span>RECOVERY</span>
+            <span class="text-zinc-500 group-hover:text-zinc-300 text-xs font-bold">›</span>
+          </div>
+        </div>
+
+        <!-- DIAL 3: STRAIN -->
+        <div
+          (click)="setPillar('strain')"
+          class="flex flex-col items-center justify-center cursor-pointer group transition-transform active:scale-95"
+        >
+          <div class="relative w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center">
+            <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
+              <circle
+                cx="50"
+                cy="50"
+                r="38"
+                stroke="rgba(255, 255, 255, 0.08)"
+                stroke-width="7"
+                fill="transparent"
+              />
+              <circle
+                cx="50"
+                cy="50"
+                r="38"
+                stroke="#0ea5e9"
+                stroke-width="7"
+                stroke-linecap="round"
+                fill="transparent"
+                [style.strokeDasharray]="dialCircumference"
+                [style.strokeDashoffset]="strainStrokeOffset()"
+                class="transition-all duration-1000 ease-out"
+                style="filter: drop-shadow(0 0 8px rgba(14, 165, 233, 0.45));"
+              />
+            </svg>
+
+            <div class="absolute flex flex-col items-center justify-center">
+              <span class="text-xl sm:text-2xl font-black text-white font-sans tracking-tight">
+                {{ strainScore() | number:'1.1-1' }}
+              </span>
             </div>
           </div>
 
-          <div class="cursor-pointer hover:bg-white/[0.02] rounded-xl py-1 transition-colors" (click)="setPillar('sleep')">
-            <div class="text-[9px] text-zinc-500 uppercase tracking-widest font-semibold">SLEEP RECORD</div>
-            <div class="text-white font-bold text-base mt-0.5">
-              {{ formatMinutesToHours(todayLog()?.biometrics?.sleepMinutes || 0) }}
+          <div class="flex items-center gap-1 mt-2 text-[11px] font-bold tracking-wider text-zinc-300 group-hover:text-white uppercase font-sans">
+            <span>STRAIN</span>
+            <span class="text-zinc-500 group-hover:text-zinc-300 text-xs font-bold">›</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- THE TWO SIGNATURE WHOOP CARDS: HEALTH MONITOR & STRESS MONITOR -->
+      <section class="grid grid-cols-2 gap-3">
+        <!-- CARD 1: HEALTH MONITOR -->
+        <div
+          (click)="setPillar('recovery')"
+          class="p-4 rounded-2xl bg-[#121620] border border-white/[0.06] hover:border-white/10 transition-all cursor-pointer flex flex-col justify-between h-28 group"
+        >
+          <div class="flex items-start justify-between">
+            <span class="text-[12px] font-bold uppercase tracking-wider text-white leading-tight font-sans">
+              HEALTH<br>MONITOR
+            </span>
+            <span class="text-zinc-500 group-hover:text-zinc-300 text-xs font-bold">›</span>
+          </div>
+
+          <div class="flex items-center gap-2.5">
+            <div class="w-6 h-6 rounded-md bg-[#00F5A0]/15 border border-[#00F5A0]/40 flex items-center justify-center text-[#00F5A0] text-xs font-black">
+              ✓
+            </div>
+            <div>
+              <div class="text-[11px] font-bold text-[#00F5A0] leading-none uppercase font-sans">
+                {{ allVitalsNormal() ? 'WITHIN RANGE' : '1 ELEVATED' }}
+              </div>
+              <div class="text-[10px] text-zinc-400 font-mono mt-1">
+                5/5 Metrics
+              </div>
             </div>
           </div>
+        </div>
+
+        <!-- CARD 2: STRESS MONITOR -->
+        <div
+          (click)="setPillar('recovery')"
+          class="p-4 rounded-2xl bg-[#121620] border border-white/[0.06] hover:border-white/10 transition-all cursor-pointer flex flex-col justify-between h-28 group"
+        >
+          <div class="flex items-start justify-between">
+            <span class="text-[12px] font-bold uppercase tracking-wider text-white leading-tight font-sans">
+              STRESS<br>MONITOR
+            </span>
+            <span class="text-zinc-500 group-hover:text-zinc-300 text-xs font-bold">›</span>
+          </div>
+
+          <div class="flex items-center gap-2.5">
+            <div class="px-2 py-1 rounded-md bg-[#00F5A0]/15 border border-[#00F5A0]/40 text-[#00F5A0] text-xs font-black font-mono">
+              {{ currentStressScore() }}
+            </div>
+            <div>
+              <div class="text-[11px] font-bold text-[#00F5A0] leading-none uppercase font-sans">
+                {{ currentStressLabel() }}
+              </div>
+              <div class="text-[10px] text-zinc-400 font-mono mt-1">
+                {{ currentFormattedTime() }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MY DAY SECTION -->
+      <section class="space-y-3 pt-2">
+        <div class="text-lg font-bold text-white tracking-tight px-1 font-sans">
+          My Day
+        </div>
+
+        <!-- Daily Outlook Pill Card -->
+        <div
+          (click)="toggleDailyOutlook()"
+          class="p-3.5 rounded-2xl bg-[#121620] border border-white/[0.06] flex items-center justify-between cursor-pointer hover:border-white/10 transition-all group"
+        >
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-indigo-950/70 border border-indigo-500/30 flex items-center justify-center text-xs font-mono font-bold text-indigo-300">
+              \V/
+            </div>
+            <div class="flex items-center gap-2 text-sm font-semibold text-white font-sans">
+              <span>🌅</span>
+              <span>Daily Outlook</span>
+            </div>
+          </div>
+          <span class="text-zinc-500 group-hover:text-zinc-300 text-xs font-bold">›</span>
+        </div>
+
+        <!-- Expanded Daily Outlook Coaching Drawer -->
+        <div *ngIf="showDailyOutlook()" class="p-4 rounded-2xl bg-[#161c28] border border-indigo-500/30 space-y-3 font-sans animate-fadeIn">
+          <div class="flex items-center justify-between text-xs font-mono">
+            <span class="text-indigo-300 font-bold uppercase tracking-wider">TODAY'S COACHING INSIGHT</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 font-bold">TARGET STRAIN: {{ targetStrain().min }}–{{ targetStrain().max }}</span>
+          </div>
+          <p class="text-xs text-zinc-300 leading-relaxed">
+            Based on your overnight recovery of <strong [ngClass]="recoveryColor().text">{{ recoveryScore() }}%</strong>, your cardiovascular capacity is calibrated for a strain target of <strong class="text-cyan-300">{{ targetStrain().min }}–{{ targetStrain().max }}</strong>. Sleep need tonight is projected at <strong class="text-indigo-300">{{ formatMinutesToHours(tonightSleepNeedMinutes()) }}</strong>.
+          </p>
         </div>
       </section>
 
@@ -2424,6 +2504,20 @@
           </button>
         </div>
       </form>
+
+      <!-- Account Info & Sign Out -->
+      <div *ngIf="authService.currentUser() as user" class="pt-3 border-t border-white/[0.08] flex items-center justify-between text-[11px] font-sans">
+        <div class="truncate max-w-[200px] text-zinc-400">
+          Account: <span class="text-white font-semibold">{{ user.email || user.displayName }}</span>
+        </div>
+        <button
+          type="button"
+          (click)="logout(); closeProfileModal()"
+          class="text-[10px] text-rose-400 hover:text-rose-300 font-bold px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 uppercase transition-colors cursor-pointer"
+        >
+          LOGOUT
+        </button>
+      </div>
     </div>
   </div>
 
@@ -2695,5 +2789,69 @@
       </div>
     </div>
   </div>
+
+  <!-- WHOOP Signature Bottom Navigation Dock -->
+  <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-[#0a0d14]/95 backdrop-blur-2xl border-t border-white/[0.08] z-40 py-2.5 px-3 flex items-center justify-around font-mono text-[9px] tracking-wider font-semibold">
+    <button
+      type="button"
+      (click)="setPillar('overview')"
+      class="flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer"
+      [ngClass]="activePillar() === 'overview' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 3" />
+      </svg>
+      <span>HOME</span>
+    </button>
+
+    <button
+      type="button"
+      (click)="setPillar('recovery')"
+      class="flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer"
+      [ngClass]="activePillar() === 'recovery' ? 'text-[#00F5A0]' : 'text-zinc-500 hover:text-zinc-300'"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+      </svg>
+      <span>RECOVERY</span>
+    </button>
+
+    <button
+      type="button"
+      (click)="setPillar('strain')"
+      class="flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer"
+      [ngClass]="activePillar() === 'strain' ? 'text-cyan-400' : 'text-zinc-500 hover:text-zinc-300'"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+      <span>STRAIN</span>
+    </button>
+
+    <button
+      type="button"
+      (click)="setPillar('sleep')"
+      class="flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer"
+      [ngClass]="activePillar() === 'sleep' ? 'text-indigo-400' : 'text-zinc-500 hover:text-zinc-300'"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+      </svg>
+      <span>SLEEP</span>
+    </button>
+
+    <button
+      type="button"
+      (click)="setPillar('sensors')"
+      class="flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer"
+      [ngClass]="activePillar() === 'sensors' ? 'text-amber-400' : 'text-zinc-500 hover:text-zinc-300'"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+      <span>SENSORS</span>
+    </button>
+  </nav>
 
 </div>
