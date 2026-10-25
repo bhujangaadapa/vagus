@@ -76,11 +76,23 @@ export interface RollingDayMetric {
 /**
  * User Demographics for Personalized Physiological Calibration
  */
+export interface ScaleMeasurement {
+  id?: string;
+  weightKg: number;
+  weightLbs: number;
+  bodyFatPercent?: number;
+  bmi: number;
+  timestamp: string;
+  source: 'HEALTH_CONNECT' | 'GOOGLE_FIT' | 'BLE_SCALE' | 'MANUAL';
+  deviceName?: string;
+}
+
 export interface UserDemographics {
   gender: 'male' | 'female' | 'other';
   age: number;        // in years (e.g. 26)
   weightKg: number;   // in kilograms (e.g. 75)
   heightCm: number;   // in centimeters (e.g. 180)
+  bodyFatPercent?: number; // from GE Fit Profile Smart Scale
 }
 
 /**

@@ -8,6 +8,7 @@ import { PedometerService } from '../../services/pedometer.service';
 import { BleHeartRateService, BleWorkoutTimelinePoint, SportActivityDef, AVAILABLE_SPORTS } from '../../services/ble-heart-rate.service';
 import { CameraPpgService } from '../../services/camera-ppg.service';
 import { FitbitIntegrationService } from '../../services/fitbit-integration.service';
+import { SmartScaleService } from '../../services/smart-scale.service';
 import { DailyBiometricLog, JournalHabits, RecordedWorkoutActivity } from '../../models/biometrics.interface';
 
 @Component({
@@ -22,11 +23,12 @@ export class DashboardComponent implements OnInit {
   public readonly isNativeApp = Capacitor.isNativePlatform();
   public readonly authService = inject(AuthService);
   private readonly dataBridge = inject(DataBridgeService);
-  private readonly physicsEngine = inject(PhysicsEngineService);
+  public readonly physicsEngine = inject(PhysicsEngineService);
   public readonly pedometer = inject(PedometerService);
   public readonly bleHR = inject(BleHeartRateService);
   public readonly ppg = inject(CameraPpgService);
   public readonly fitbit = inject(FitbitIntegrationService);
+  public readonly smartScale = inject(SmartScaleService);
 
   // Active user ID derived from Auth state
   public readonly activeUserId = computed(() => {
@@ -144,8 +146,8 @@ export class DashboardComponent implements OnInit {
   }
 
   // Active Hardware Sub-Tab in Sensors & Lab
-  public readonly activeHardwareTab = signal<'polar' | 'ppg' | 'fitbit' | 'steps' | 'pacer' | 'algorithms'>('polar');
-  public setHardwareTab(tab: 'polar' | 'ppg' | 'fitbit' | 'steps' | 'pacer' | 'algorithms'): void {
+  public readonly activeHardwareTab = signal<'polar' | 'ppg' | 'fitbit' | 'scale' | 'steps' | 'pacer' | 'algorithms'>('polar');
+  public setHardwareTab(tab: 'polar' | 'ppg' | 'fitbit' | 'scale' | 'steps' | 'pacer' | 'algorithms'): void {
     this.activeHardwareTab.set(tab);
   }
 
@@ -760,6 +762,39 @@ export class DashboardComponent implements OnInit {
 
   public quickAddSteps(amount: number): void {
     this.manualStepsInput.set(Math.max(0, this.manualStepsInput() + amount));
+  }
+
+  // GE Fit Profile Smart Scale Integration
+  public readonly showScaleModal = signal<boolean>(false);
+  public readonly scaleWeightInput = signal<number>(75);
+  public readonly scaleBodyFatInput = signal<number | null>(null);
+
+  public openManualScaleModal(): void {
+    const demo = this.athleteDemographics();
+    this.scaleWeightInput.set(this.smartScale.latestMeasurement()?.weightKg || demo.weightKg || 75);
+    this.scaleBodyFatInput.set(this.smartScale.latestMeasurement()?.bodyFatPercent || demo.bodyFatPercent || null);
+    this.showScaleModal.set(true);
+  }
+
+  public closeManualScaleModal(): void {
+    this.showScaleModal.set(false);
+  }
+
+  public async saveManualScaleWeight(): Promise<void> {
+    const w = Number(this.scaleWeightInput());
+    const bf = this.scaleBodyFatInput() ? Number(this.scaleBodyFatInput()) : undefined;
+    if (w > 20 && w < 350) {
+      await this.smartScale.recordManualWeight(w, bf, this.activeUserId());
+      this.closeManualScaleModal();
+    }
+  }
+
+  public async syncScaleHealthConnect(): Promise<void> {
+    await this.smartScale.syncWithHealthConnect(this.activeUserId());
+  }
+
+  public async connectBleScale(): Promise<void> {
+    await this.smartScale.connectBleScale(this.activeUserId());
   }
 
   // Email Login Modal

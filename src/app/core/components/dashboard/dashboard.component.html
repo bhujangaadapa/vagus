@@ -1399,7 +1399,7 @@
     <div *ngIf="activePillar() === 'sensors'" class="space-y-4">
       
       <!-- Sensor Sub-Tabs Navigation (Dedicated Hardware & Utility Lab) -->
-      <div class="grid grid-cols-6 gap-1 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] text-[9px] font-mono tracking-wider font-semibold">
+      <div class="grid grid-cols-7 gap-1 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] text-[9px] font-mono tracking-wider font-semibold">
         <button
           type="button"
           (click)="setHardwareTab('polar')"
@@ -1425,6 +1425,15 @@
           [ngClass]="activeHardwareTab() === 'fitbit' ? 'bg-cyan-600/40 text-cyan-200 border border-cyan-500/40 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
         >
           FITBIT
+        </button>
+
+        <button
+          type="button"
+          (click)="setHardwareTab('scale')"
+          class="py-1.5 rounded-xl transition-all text-center cursor-pointer truncate"
+          [ngClass]="activeHardwareTab() === 'scale' ? 'bg-amber-600/40 text-amber-200 border border-amber-500/40 font-bold' : 'text-zinc-400 hover:text-zinc-200'"
+        >
+          SCALE
         </button>
 
         <button
@@ -1814,6 +1823,150 @@
             <div *ngIf="fitbit.syncError()" class="mt-2 text-rose-400 text-[10px] font-mono">
               {{ fitbit.syncError() }}
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SENSOR 3B: GE FIT PROFILE SMART SCALE -->
+      <section *ngIf="activeHardwareTab() === 'scale'" class="whoop-surface p-5 rounded-3xl space-y-4">
+        <!-- Scale Header -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div
+              class="w-2.5 h-2.5 rounded-full"
+              [ngClass]="smartScale.isBleScanning() || smartScale.isSyncing() ? 'bg-amber-400 animate-pulse' : (smartScale.latestMeasurement() ? 'bg-[#00F5A0] shadow-[0_0_8px_#00F5A0]' : 'bg-zinc-600')"
+            ></div>
+            <span class="text-xs font-mono uppercase tracking-wider font-bold text-white">GE FIT PROFILE SMART SCALE</span>
+          </div>
+          <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300">
+            HEALTH CONNECT & BLE 0x181D
+          </span>
+        </div>
+
+        <div class="space-y-4 font-mono text-xs">
+          <!-- Primary Telemetry Card: Current Weight & Body Composition -->
+          <div class="p-4 rounded-2xl bg-black/40 border border-white/[0.04] space-y-3">
+            <div class="flex items-baseline justify-between">
+              <div>
+                <span class="text-[10px] text-zinc-500 uppercase tracking-wider">BODY WEIGHT</span>
+                <div class="flex items-baseline gap-2 mt-0.5">
+                  <span class="text-3xl font-black text-white font-sans">
+                    {{ smartScale.latestMeasurement()?.weightKg || athleteDemographics().weightKg || '—' }}
+                  </span>
+                  <span class="text-xs font-bold text-zinc-400">kg</span>
+                  <span class="text-sm font-semibold text-zinc-500">
+                    ({{ smartScale.latestMeasurement()?.weightLbs || Math.round((athleteDemographics().weightKg || 75) * 2.20462 * 10) / 10 }} lbs)
+                  </span>
+                </div>
+              </div>
+
+              <!-- BMI Category Badge -->
+              <div *ngIf="smartScale.latestMeasurement()?.bmi" class="text-right">
+                <span class="text-[10px] text-zinc-500 uppercase tracking-wider">BMI</span>
+                <div class="flex items-center gap-1.5 justify-end mt-0.5">
+                  <span class="text-lg font-bold text-white font-sans">{{ smartScale.latestMeasurement()?.bmi }}</span>
+                  <span
+                    class="text-[9px] px-2 py-0.5 rounded-full border font-bold"
+                    [ngClass]="[
+                      smartScale.getBmiCategory(smartScale.latestMeasurement()!.bmi).bg,
+                      smartScale.getBmiCategory(smartScale.latestMeasurement()!.bmi).border,
+                      smartScale.getBmiCategory(smartScale.latestMeasurement()!.bmi).color
+                    ]"
+                  >
+                    {{ smartScale.getBmiCategory(smartScale.latestMeasurement()!.bmi).label }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Body Composition Grid (BIA Analysis) -->
+            <div class="grid grid-cols-3 gap-2 pt-2 border-t border-white/[0.05] text-[10px]">
+              <div>
+                <span class="text-zinc-500 uppercase">BODY FAT</span>
+                <div class="text-sm font-bold text-white font-sans mt-0.5">
+                  {{ smartScale.latestMeasurement()?.bodyFatPercent ? (smartScale.latestMeasurement()?.bodyFatPercent + '%') : (athleteDemographics().bodyFatPercent ? athleteDemographics().bodyFatPercent + '%' : '—') }}
+                </div>
+              </div>
+              <div>
+                <span class="text-zinc-500 uppercase">CALIBRATED BMR</span>
+                <div class="text-sm font-bold text-amber-300 font-sans mt-0.5">
+                  {{ physicsEngine.calculateBMR(athleteDemographics().weightKg, athleteDemographics().heightCm, athleteDemographics().age, athleteDemographics().gender) }} <span class="text-[9px] text-zinc-400 font-normal">kcal</span>
+                </div>
+              </div>
+              <div>
+                <span class="text-zinc-500 uppercase">SOURCE</span>
+                <div class="text-[11px] font-bold text-zinc-300 mt-0.5 truncate">
+                  {{ smartScale.latestMeasurement()?.source || 'BASELINE' }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Live Status Message -->
+            <div class="text-[10px] text-zinc-400 font-sans flex items-center justify-between">
+              <span>{{ smartScale.syncStatus() }}</span>
+              <span *ngIf="smartScale.latestMeasurement()?.timestamp" class="text-zinc-500 font-mono text-[9px]">
+                {{ smartScale.latestMeasurement()?.timestamp | date:'short' }}
+              </span>
+            </div>
+
+            <div *ngIf="smartScale.syncError()" class="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-[10px] font-mono">
+              ⚠️ {{ smartScale.syncError() }}
+            </div>
+          </div>
+
+          <!-- Method 1: Google Health Connect / Google Fit Bridge -->
+          <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] space-y-2 font-sans">
+            <div class="flex items-center justify-between font-mono">
+              <span class="text-xs font-bold text-amber-300 uppercase">1. Google Health Connect Bridge</span>
+              <span *ngIf="smartScale.isSyncing()" class="text-[10px] text-amber-400 animate-pulse">QUERYING...</span>
+            </div>
+            <p class="text-[11px] text-zinc-400 leading-relaxed">
+              When you weigh in with your <strong class="text-zinc-200">GE Fit Profile scale</strong>, the Fit Profile app automatically syncs weight, body fat %, and BMI to <strong class="text-zinc-200">Google Health Connect</strong>. Tap below to import the latest weigh-in into Vagus:
+            </p>
+            <button
+              type="button"
+              (click)="syncScaleHealthConnect()"
+              [disabled]="smartScale.isSyncing()"
+              class="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.25)] disabled:opacity-50"
+            >
+              {{ smartScale.isSyncing() ? 'SYNCING HEALTH CONNECT...' : '⚡ SYNC FROM HEALTH CONNECT / FIT' }}
+            </button>
+          </div>
+
+          <!-- Method 2: Direct Bluetooth Low Energy (BLE) Weigh-In -->
+          <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] space-y-2 font-sans">
+            <div class="flex items-center justify-between font-mono">
+              <span class="text-xs font-bold text-cyan-300 uppercase">2. Direct Bluetooth LE Scale Pairing</span>
+              <span class="text-[9px] px-2 py-0.5 rounded-full bg-white/[0.05] text-zinc-400">UUID 0x181D</span>
+            </div>
+            <p class="text-[11px] text-zinc-400 leading-relaxed">
+              Step on your GE Fit Profile Smart Scale with bare feet to power on the Bluetooth broadcast, then pair directly to stream weight live via BLE:
+            </p>
+            <button
+              type="button"
+              (click)="connectBleScale()"
+              [disabled]="smartScale.isBleScanning()"
+              class="w-full py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-cyan-500/30 text-cyan-300 font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+            >
+              {{ smartScale.isBleScanning() ? 'SCANNING FOR GE SCALE...' : '📶 CONNECT GE SCALE VIA BLUETOOTH' }}
+            </button>
+          </div>
+
+          <!-- Method 3: Manual Weigh-In Entry -->
+          <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] space-y-2 font-sans">
+            <div class="flex items-center justify-between font-mono">
+              <span class="text-xs font-bold text-zinc-400 uppercase">3. Manual Weigh-In</span>
+            </div>
+            <p class="text-[11px] text-zinc-400 leading-relaxed">
+              Enter your current scale reading manually to calibrate your BMR and TRIMP calorie engine:
+            </p>
+            <button
+              type="button"
+              (click)="openManualScaleModal()"
+              class="w-full py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+            >
+              ✏️ LOG MANUAL WEIGH-IN
+            </button>
           </div>
         </div>
       </section>
@@ -2453,6 +2606,92 @@
         >
           Cancel
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: MANUAL WEIGH-IN (SCALE) -->
+  <div
+    *ngIf="showScaleModal()"
+    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
+  >
+    <div class="whoop-surface p-6 rounded-3xl max-w-sm w-full border border-white/10 space-y-5 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">⚖️</span>
+          <h3 class="text-sm font-mono uppercase tracking-wider font-bold text-white">MANUAL WEIGH-IN</h3>
+        </div>
+        <button
+          type="button"
+          (click)="closeManualScaleModal()"
+          class="text-zinc-500 hover:text-white text-xs font-mono p-1"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div class="space-y-4 font-mono text-xs">
+        <!-- Weight in kg -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between text-zinc-400">
+            <label class="text-[10px] uppercase font-bold">BODY WEIGHT (KG)</label>
+            <span class="text-[10px] text-zinc-500 font-sans">
+              ≈ {{ Math.round(scaleWeightInput() * 2.20462 * 10) / 10 }} lbs
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            <input
+              type="number"
+              step="0.1"
+              min="20"
+              max="350"
+              [value]="scaleWeightInput()"
+              (input)="scaleWeightInput.set(+$any($event.target).value)"
+              class="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2.5 text-white font-sans text-lg font-bold focus:outline-none focus:border-amber-400"
+            />
+            <span class="text-xs text-zinc-400 font-bold">KG</span>
+          </div>
+        </div>
+
+        <!-- Body Fat % -->
+        <div class="space-y-1.5">
+          <label class="text-[10px] uppercase text-zinc-400 font-bold">BODY FAT % (OPTIONAL)</label>
+          <div class="flex items-center gap-2">
+            <input
+              type="number"
+              step="0.1"
+              min="3"
+              max="65"
+              placeholder="e.g. 16.5"
+              [value]="scaleBodyFatInput() ?? ''"
+              (input)="scaleBodyFatInput.set($any($event.target).value ? +$any($event.target).value : null)"
+              class="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2.5 text-white font-sans text-lg font-bold focus:outline-none focus:border-amber-400"
+            />
+            <span class="text-xs text-zinc-400 font-bold">%</span>
+          </div>
+        </div>
+
+        <p class="text-[11px] text-zinc-400 font-sans leading-relaxed">
+          Saving updates your athlete profile and recalibrates your Basal Metabolic Rate (BMR) and TRIMP workout strain metrics.
+        </p>
+
+        <!-- Action Buttons -->
+        <div class="space-y-2 pt-2">
+          <button
+            type="button"
+            (click)="saveManualScaleWeight()"
+            class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold uppercase tracking-wider text-xs transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] cursor-pointer"
+          >
+            SAVE WEIGH-IN
+          </button>
+          <button
+            type="button"
+            (click)="closeManualScaleModal()"
+            class="w-full py-2 text-center text-zinc-500 hover:text-white text-xs uppercase cursor-pointer"
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   </div>
