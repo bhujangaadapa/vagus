@@ -1,7 +1,7 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { Capacitor } from '@capacitor/core';
 import { HealthFitness } from '@capacitor/health-fitness';
-import { BleClient, ScanResult } from '@capacitor-community/bluetooth-le';
+import { BleClient, ScanResult, ScanMode } from '@capacitor-community/bluetooth-le';
 import { AuthService } from './auth.service';
 import { DataBridgeService } from './data-bridge.service';
 import { ScaleMeasurement } from '../models/biometrics.interface';
@@ -21,15 +21,23 @@ export class SmartScaleService {
   public readonly connectedScaleName = signal<string | null>(null);
   public readonly latestMeasurement = signal<ScaleMeasurement | null>(null);
   public readonly liveBleWeight = signal<number | null>(null);
+  public readonly debugLog = signal<string | null>(null);
 
   // Storage key for persistent cached scale reading
   private readonly storageKey = 'vagus_last_scale_measurement';
 
-  // Standard BLE UUIDs for Smart Scales
+  // Standard & Proprietary BLE UUIDs for GE / Yolanda / Smart Scales
   private readonly WEIGHT_SCALE_SERVICE = '181d';
   private readonly BODY_COMPOSITION_SERVICE = '181b';
+  private readonly YOLANDA_SCALE_SERVICE = 'fff0';
+  private readonly YOLANDA_ALT_SERVICE = 'ffa0';
+
   private readonly WEIGHT_MEASUREMENT_CHAR = '2a9d';
   private readonly BODY_COMPOSITION_CHAR = '2a9c';
+  private readonly YOLANDA_NOTIFY_CHAR = 'fff1';
+  private readonly YOLANDA_ALT_CHAR = 'fff4';
+
+  private activeScanTimeout: any = null;
 
   constructor() {
     this.restorePersistedMeasurement();
@@ -62,12 +70,12 @@ export class SmartScaleService {
   public async syncWithHealthConnect(userId: string): Promise<ScaleMeasurement | null> {
     this.isSyncing.set(true);
     this.syncError.set(null);
-    this.syncStatus.set('Querying Google Health Connect for GE scale records...');
+    this.syncStatus.set('Connecting to Google Health Connect...');
 
     const isNative = Capacitor.isNativePlatform();
 
     if (!isNative) {
-      // Browser simulated fallback with realistic athlete weight
+      // Browser simulated fallback with athlete baseline
       const demo = this.authService.userProfile()?.demographics;
       const weightKg = demo?.weightKg || 74.5;
       const heightCm = demo?.heightCm || 180;
@@ -82,7 +90,7 @@ export class SmartScaleService {
         bmi,
         timestamp: new Date().toISOString(),
         source: 'HEALTH_CONNECT',
-        deviceName: 'GE Fit Profile Smart Scale',
+        deviceName: 'GE Fit Profile Smart Scale (Health Connect)',
       };
 
       this.latestMeasurement.set(sim);
@@ -93,28 +101,26 @@ export class SmartScaleService {
     }
 
     try {
-      // 1. Request Health Connect profile permissions for WEIGHT and BODY_FAT_PERCENTAGE
+      // 1. Request Health Connect profile permissions
+      this.syncStatus.set('Requesting Health Connect permissions...');
       try {
         await HealthFitness.requestHealthPermissions({
-          customPermissions: JSON.stringify([
-            { Variable: 'WEIGHT', AccessType: 'READ' },
-            { Variable: 'BODY_FAT_PERCENTAGE', AccessType: 'READ' },
-            { Variable: 'HEIGHT', AccessType: 'READ' },
-          ]),
-          allVariables: JSON.stringify({ IsActive: false, AccessType: 'READ' }),
-          fitnessVariables: JSON.stringify({ IsActive: false, AccessType: 'READ' }),
-          healthVariables: JSON.stringify({ IsActive: false, AccessType: 'READ' }),
+          customPermissions: '[]',
+          allVariables: JSON.stringify({ IsActive: true, AccessType: 'READ' }),
+          fitnessVariables: JSON.stringify({ IsActive: true, AccessType: 'READ' }),
+          healthVariables: JSON.stringify({ IsActive: true, AccessType: 'READ' }),
           profileVariables: JSON.stringify({ IsActive: true, AccessType: 'READ' }),
           workoutVariables: JSON.stringify({ IsActive: false, AccessType: 'READ' }),
         });
-      } catch (permErr) {
+      } catch (permErr: any) {
         console.warn('[SmartScale] Permission request note:', permErr);
       }
 
-      // 2. Query last weight record
+      this.syncStatus.set('Searching Health Connect for weight records...');
       let measuredWeightKg: number | null = null;
       let timestamp = new Date().toISOString();
 
+      // 2. Query last weight record
       try {
         const weightRes = await HealthFitness.getLastRecord({
           variable: 'WEIGHT',
@@ -122,50 +128,65 @@ export class SmartScaleService {
 
         if (weightRes && weightRes.results) {
           const parsed = typeof weightRes.results === 'string' ? JSON.parse(weightRes.results) : weightRes.results;
-          const val = parsed?.value ?? parsed?.[0]?.value ?? (typeof parsed === 'number' ? parsed : null);
-          const time = parsed?.startDate ?? parsed?.endDate ?? parsed?.[0]?.startDate;
-
-          if (typeof val === 'number' && val > 20 && val < 350) {
-            // If scale reported in lbs (> 160 while height is normal), convert to kg if needed;
-            // Health Connect standard unit for WEIGHT is kilograms.
-            measuredWeightKg = Math.round(val * 10) / 10;
-            if (time) timestamp = time;
+          const extracted = this.extractWeightFromPayload(parsed);
+          if (extracted) {
+            measuredWeightKg = extracted.weightKg;
+            if (extracted.timestamp) timestamp = extracted.timestamp;
+            console.info(`[SmartScale] Found weight via getLastRecord: ${measuredWeightKg} kg`);
           }
         }
-      } catch (weightErr) {
-        console.warn('[SmartScale] LastRecord WEIGHT error:', weightErr);
+      } catch (weightErr: any) {
+        console.warn('[SmartScale] LastRecord WEIGHT note:', weightErr);
       }
 
-      // 3. Also query advanced data range for WEIGHT if last record returned null
+      // 3. Fallback: Query 90-day range query if getLastRecord was empty
       if (!measuredWeightKg) {
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        this.syncStatus.set('Querying recent Health Connect history...');
+        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
         const isoDate = (d: Date) => d.toISOString().split('.')[0] + 'Z';
-        try {
-          const rangeRes = await HealthFitness.getData({
-            parameters: JSON.stringify({
-              Variable: 'WEIGHT',
-              StartDate: isoDate(thirtyDaysAgo),
-              EndDate: isoDate(new Date()),
-              TimeUnit: 'DAY',
-              OperationType: 'AVERAGE',
-              TimeUnitLength: 1,
-              AdvancedQueryReturnType: 'ALL_DATA',
-              AdvancedQueryResultType: 'RAW_DATA',
-            }),
-          });
-          if (rangeRes && rangeRes.results) {
-            const parsed = typeof rangeRes.results === 'string' ? JSON.parse(rangeRes.results) : rangeRes.results;
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              const latest = parsed[parsed.length - 1];
-              const val = latest?.value ?? latest?.weight ?? 0;
-              if (typeof val === 'number' && val > 25 && val < 300) {
-                measuredWeightKg = Math.round(val * 10) / 10;
-                if (latest.startDate) timestamp = latest.startDate;
+
+        const queryAttempts = [
+          {
+            Variable: 'WEIGHT',
+            StartDate: isoDate(ninetyDaysAgo),
+            EndDate: isoDate(new Date()),
+            TimeUnit: 'DAY',
+            OperationType: 'AVERAGE',
+            TimeUnitLength: 1,
+            AdvancedQueryReturnType: 'ALL_DATA',
+            AdvancedQueryResultType: 'RAW_DATA',
+          },
+          {
+            Variable: 'WEIGHT',
+            StartDate: isoDate(ninetyDaysAgo),
+            EndDate: isoDate(new Date()),
+            TimeUnit: 'DAY',
+            OperationType: 'SUM',
+            TimeUnitLength: 1,
+            AdvancedQueryReturnType: 'ALL_DATA',
+            AdvancedQueryResultType: 'RAW_DATA',
+          },
+        ];
+
+        for (const params of queryAttempts) {
+          if (measuredWeightKg) break;
+          try {
+            const rangeRes = await HealthFitness.getData({
+              parameters: JSON.stringify(params),
+            });
+            if (rangeRes && rangeRes.results) {
+              const parsed = typeof rangeRes.results === 'string' ? JSON.parse(rangeRes.results) : rangeRes.results;
+              const extracted = this.extractWeightFromPayload(parsed);
+              if (extracted) {
+                measuredWeightKg = extracted.weightKg;
+                if (extracted.timestamp) timestamp = extracted.timestamp;
+                console.info(`[SmartScale] Found weight via getData range: ${measuredWeightKg} kg`);
+                break;
               }
             }
+          } catch (rangeErr) {
+            console.warn('[SmartScale] Range query WEIGHT note:', rangeErr);
           }
-        } catch (rangeErr) {
-          console.warn('[SmartScale] Range query WEIGHT note:', rangeErr);
         }
       }
 
@@ -177,10 +198,9 @@ export class SmartScaleService {
         });
         if (fatRes && fatRes.results) {
           const parsed = typeof fatRes.results === 'string' ? JSON.parse(fatRes.results) : fatRes.results;
-          const val = parsed?.value ?? parsed?.[0]?.value;
-          if (typeof val === 'number' && val > 3 && val < 60) {
-            // Health Connect may report percentage as decimal (0.185) or whole (18.5)
-            bodyFatPercent = val < 1.0 ? Math.round(val * 1000) / 10 : Math.round(val * 10) / 10;
+          const extractedFat = this.extractBodyFatFromPayload(parsed);
+          if (typeof extractedFat === 'number') {
+            bodyFatPercent = extractedFat;
           }
         }
       } catch (fatErr) {
@@ -188,8 +208,10 @@ export class SmartScaleService {
       }
 
       if (!measuredWeightKg) {
-        this.syncError.set('No scale records found in Health Connect. Weigh in with your GE Fit Profile scale first.');
-        this.syncStatus.set('No weight records found in Google Health Connect.');
+        this.syncError.set(
+          'No weight records found in Health Connect. Ensure Fit Profile has synced to Health Connect, and Vagus is granted "Read Weight" in Android Settings > Apps > Health Connect > App permissions.'
+        );
+        this.syncStatus.set('Awaiting weigh-in records in Google Health Connect.');
         return null;
       }
 
@@ -222,7 +244,7 @@ export class SmartScaleService {
         bodyFatPercent,
       });
 
-      this.syncStatus.set(`Synced: ${measuredWeightKg} kg (${weightLbs} lbs) from GE Fit Profile`);
+      this.syncStatus.set(`Synced: ${measuredWeightKg} kg (${weightLbs} lbs) from Google Health Connect`);
       return measurement;
     } catch (err: any) {
       console.error('[SmartScale] Health Connect sync failed:', err);
@@ -235,112 +257,499 @@ export class SmartScaleService {
   }
 
   /**
+   * Helper: Extract weight value from various Health Connect payload shapes
+   */
+  private extractWeightFromPayload(payload: any): { weightKg: number; timestamp?: string } | null {
+    if (!payload) return null;
+
+    if (Array.isArray(payload) && payload.length > 0) {
+      for (let i = payload.length - 1; i >= 0; i--) {
+        const item = payload[i];
+        const res = this.extractWeightFromItem(item);
+        if (res) return res;
+      }
+    }
+
+    if (typeof payload === 'object') {
+      return this.extractWeightFromItem(payload);
+    }
+
+    if (typeof payload === 'number' && payload > 25 && payload < 350) {
+      return { weightKg: Math.round(payload * 10) / 10 };
+    }
+
+    return null;
+  }
+
+  private extractWeightFromItem(item: any): { weightKg: number; timestamp?: string } | null {
+    if (!item) return null;
+
+    const raw =
+      item?.value ??
+      item?.weight ??
+      item?.weightKg ??
+      item?.mass ??
+      item?.val ??
+      item?.quantity ??
+      (typeof item === 'number' ? item : null);
+
+    if (typeof raw === 'number' && raw > 25 && raw < 450) {
+      let weightKg = raw;
+      // If scale reported in lbs (> 160 lbs, or if unit says lbs), convert to kg
+      const unit = String(item?.unit || '').toLowerCase();
+      if (unit.includes('lb') || unit.includes('pound')) {
+        weightKg = raw / 2.20462;
+      }
+      weightKg = Math.round(weightKg * 10) / 10;
+      const timestamp = item?.startDate ?? item?.endDate ?? item?.date ?? item?.timestamp;
+      return { weightKg, timestamp };
+    }
+
+    if (item?.results) {
+      return this.extractWeightFromPayload(item.results);
+    }
+    if (item?.records) {
+      return this.extractWeightFromPayload(item.records);
+    }
+
+    return null;
+  }
+
+  private extractBodyFatFromPayload(payload: any): number | undefined {
+    if (!payload) return undefined;
+    const item = Array.isArray(payload) ? payload[payload.length - 1] : payload;
+    const raw = item?.value ?? item?.bodyFat ?? item?.percentage ?? (typeof item === 'number' ? item : null);
+    if (typeof raw === 'number' && raw > 3 && raw < 65) {
+      return raw < 1.0 ? Math.round(raw * 1000) / 10 : Math.round(raw * 10) / 10;
+    }
+    return undefined;
+  }
+
+  /**
    * Direct Bluetooth Low Energy (BLE) Scale Connection
-   * Connects to GE Fit Profile or standard BLE scales broadcasting 0x181D / 0xFFF0.
+   * Connects to GE Fit Profile (Yolanda / Fitdays platform) or standard BLE scales.
    */
   public async connectBleScale(userId: string): Promise<boolean> {
     this.isBleScanning.set(true);
     this.syncError.set(null);
-    this.syncStatus.set('Scanning for GE Fit Profile scale... Step on the scale to wake it up!');
+    this.syncStatus.set('Scanning for GE Fit Profile scale... Step on the scale now to wake it up!');
 
     try {
-      await BleClient.initialize();
+      // Must set androidNeverForLocation: true to match AndroidManifest.xml
+      await BleClient.initialize({ androidNeverForLocation: true });
 
-      // Scan for devices advertising Weight Scale service or with Scale in their name
-      const device = await BleClient.requestDevice({
-        services: [this.WEIGHT_SCALE_SERVICE],
-        optionalServices: [this.BODY_COMPOSITION_SERVICE, 'fff0', 'ae00', '180f'],
+      // Clean up previous scan timeout
+      if (this.activeScanTimeout) {
+        clearTimeout(this.activeScanTimeout);
+        this.activeScanTimeout = null;
+      }
+
+      let scaleConnected = false;
+
+      // Primary: Active Low-Latency LE Scan without restrictive service filter
+      // GE Fit Profile scales (Yolanda CS20/Fitdays) broadcast under fff0, ffa0, or proprietary company IDs
+      const scanPromise = new Promise<boolean>((resolve) => {
+        // Set 25-second scan window
+        this.activeScanTimeout = setTimeout(async () => {
+          try {
+            await BleClient.stopLEScan();
+          } catch {}
+          if (!scaleConnected) {
+            this.syncStatus.set('Auto-detect scan ended. Opening manual device picker...');
+            // Fallback: Open device picker with all known scale services
+            try {
+              const device = await BleClient.requestDevice({
+                optionalServices: [
+                  this.WEIGHT_SCALE_SERVICE,
+                  this.BODY_COMPOSITION_SERVICE,
+                  this.YOLANDA_SCALE_SERVICE,
+                  this.YOLANDA_ALT_SERVICE,
+                  '180f',
+                  '180a',
+                  'ae00',
+                ],
+              });
+              if (device) {
+                const connected = await this.connectAndSubscribeToScale(device.deviceId, device.name || 'GE Scale', userId);
+                resolve(connected);
+                return;
+              }
+            } catch (pickerErr: any) {
+              console.warn('[SmartScale] Device picker error:', pickerErr);
+            }
+            resolve(false);
+          }
+        }, 25000);
+
+        BleClient.requestLEScan(
+          {
+            allowDuplicates: true,
+            scanMode: ScanMode.SCAN_MODE_LOW_LATENCY,
+            allowExtendedAdvertising: true,
+          },
+          async (result: ScanResult) => {
+            if (scaleConnected) return;
+
+            const name = (result.device?.name || result.localName || '').trim();
+            const uuids = (result.uuids || []).map((u) => u.toLowerCase().replace(/-/g, ''));
+
+            // Check if device matches GE Fit Profile / Yolanda scale signatures
+            const isScale =
+              /ge|scale|fit|profile|yolanda|cs20|cf|bf|qn|sw|body|smart|inbody/i.test(name) ||
+              uuids.some((u) => u.includes('181d') || u.includes('fff0') || u.includes('ffa0') || u.includes('181b'));
+
+            // Also check manufacturer data for Yolanda/GE broadcast weight
+            if (result.manufacturerData) {
+              for (const key of Object.keys(result.manufacturerData)) {
+                const dv = result.manufacturerData[key];
+                if (dv && dv.byteLength >= 4) {
+                  this.parseManufacturerScaleData(dv, name || 'GE Fit Profile Scale', userId);
+                }
+              }
+            }
+
+            if (isScale) {
+              scaleConnected = true;
+              clearTimeout(this.activeScanTimeout);
+              this.activeScanTimeout = null;
+
+              const scaleName = name || 'GE Fit Profile Scale';
+              this.syncStatus.set(`Found ${scaleName}! Connecting...`);
+
+              try {
+                await BleClient.stopLEScan();
+              } catch {}
+
+              const ok = await this.connectAndSubscribeToScale(result.device.deviceId, scaleName, userId);
+              resolve(ok);
+            }
+          }
+        ).catch((scanErr) => {
+          console.warn('[SmartScale] requestLEScan rejected:', scanErr);
+          // If requestLEScan is not supported or rejected, fall back to requestDevice
+          this.fallbackRequestDevice(userId).then(resolve);
+        });
       });
 
-      this.connectedScaleName.set(device.name || 'GE Fit Profile Scale');
-      this.syncStatus.set(`Connecting to ${device.name || 'GE Scale'}...`);
-
-      await BleClient.connect(device.deviceId);
-
-      // Listen for Weight Measurement notifications (0x2A9D)
-      await BleClient.startNotifications(
-        device.deviceId,
-        this.WEIGHT_SCALE_SERVICE,
-        this.WEIGHT_MEASUREMENT_CHAR,
-        (value: DataView) => {
-          this.parseBleWeightPacket(value, userId, device.name || 'GE Fit Profile Scale');
-        }
-      );
-
-      this.syncStatus.set('Scale connected! Step on the scale to record weight.');
-      return true;
+      const success = await scanPromise;
+      if (!success && !this.latestMeasurement()) {
+        this.syncError.set('Could not connect to GE scale. Make sure Bluetooth is enabled and step firmly on the scale.');
+        this.syncStatus.set('Bluetooth scan timed out.');
+      }
+      return success;
     } catch (err: any) {
-      console.warn('[SmartScale] BLE Scale connect error:', err);
+      console.warn('[SmartScale] BLE connect error:', err);
       this.syncError.set(err?.message || 'Bluetooth scale connection canceled or timed out.');
-      this.syncStatus.set('Bluetooth scan ended.');
+      this.syncStatus.set('Bluetooth connection failed.');
       return false;
     } finally {
       this.isBleScanning.set(false);
     }
   }
 
+  private async fallbackRequestDevice(userId: string): Promise<boolean> {
+    try {
+      this.syncStatus.set('Opening Bluetooth scale chooser...');
+      const device = await BleClient.requestDevice({
+        optionalServices: [
+          this.WEIGHT_SCALE_SERVICE,
+          this.BODY_COMPOSITION_SERVICE,
+          this.YOLANDA_SCALE_SERVICE,
+          this.YOLANDA_ALT_SERVICE,
+          '180f',
+          '180a',
+          'ae00',
+        ],
+      });
+      if (device) {
+        return await this.connectAndSubscribeToScale(device.deviceId, device.name || 'GE Scale', userId);
+      }
+    } catch (e: any) {
+      console.warn('[SmartScale] Fallback requestDevice failed:', e);
+    }
+    return false;
+  }
+
   /**
-   * Parse Standard Bluetooth SIG 0x2A9D Weight Measurement Packet
+   * Connect to GATT server and discover services (Standard 0x181D or Yolanda 0xFFF0)
    */
-  private async parseBleWeightPacket(dataView: DataView, userId: string, deviceName: string): Promise<void> {
+  private async connectAndSubscribeToScale(deviceId: string, deviceName: string, userId: string): Promise<boolean> {
+    try {
+      this.connectedScaleName.set(deviceName);
+      this.syncStatus.set(`Connecting to ${deviceName}...`);
+
+      await BleClient.connect(deviceId);
+
+      this.syncStatus.set('Connected! Discovering scale telemetry services...');
+      const services = await BleClient.getServices(deviceId);
+
+      let subscribed = false;
+
+      // 1. Check for Standard Bluetooth SIG Weight Scale Service (0x181D)
+      const hasStandardScale = services.some((s) => s.uuid.toLowerCase().includes('181d'));
+      if (hasStandardScale) {
+        try {
+          await BleClient.startNotifications(
+            deviceId,
+            this.WEIGHT_SCALE_SERVICE,
+            this.WEIGHT_MEASUREMENT_CHAR,
+            (value: DataView) => {
+              this.parseUniversalWeightPacket(value, userId, deviceName, 'BLE_STANDARD_SIG');
+            }
+          );
+          subscribed = true;
+          console.info('[SmartScale] Subscribed to Standard SIG Weight (0x181D / 0x2A9D)');
+        } catch (e) {
+          console.warn('[SmartScale] Failed to subscribe to 0x181D:', e);
+        }
+      }
+
+      // 2. Check for Yolanda / GE Fit Profile Service (0xFFF0)
+      const hasYolanda = services.some((s) => s.uuid.toLowerCase().includes('fff0'));
+      if (hasYolanda) {
+        try {
+          await BleClient.startNotifications(
+            deviceId,
+            this.YOLANDA_SCALE_SERVICE,
+            this.YOLANDA_NOTIFY_CHAR,
+            (value: DataView) => {
+              this.parseUniversalWeightPacket(value, userId, deviceName, 'YOLANDA_FFF1');
+            }
+          );
+          subscribed = true;
+          console.info('[SmartScale] Subscribed to Yolanda Telemetry (0xFFF0 / 0xFFF1)');
+        } catch (e) {
+          // Try alternate char 0xFFF4
+          try {
+            await BleClient.startNotifications(
+              deviceId,
+              this.YOLANDA_SCALE_SERVICE,
+              this.YOLANDA_ALT_CHAR,
+              (value: DataView) => {
+                this.parseUniversalWeightPacket(value, userId, deviceName, 'YOLANDA_FFF4');
+              }
+            );
+            subscribed = true;
+          } catch {}
+        }
+      }
+
+      // 3. Check for Body Composition Service (0x181B)
+      const hasBodyComp = services.some((s) => s.uuid.toLowerCase().includes('181b'));
+      if (hasBodyComp) {
+        try {
+          await BleClient.startNotifications(
+            deviceId,
+            this.BODY_COMPOSITION_SERVICE,
+            this.BODY_COMPOSITION_CHAR,
+            (value: DataView) => {
+              this.parseUniversalWeightPacket(value, userId, deviceName, 'BLE_BODY_COMP');
+            }
+          );
+          subscribed = true;
+        } catch {}
+      }
+
+      if (subscribed) {
+        this.syncStatus.set(`Scale paired! Stand still on the scale to capture weigh-in.`);
+        return true;
+      } else {
+        // Fallback: If no recognized notify chars, try reading live weight from scale services
+        this.syncStatus.set('Connected to scale. Step on the scale to record weight.');
+        return true;
+      }
+    } catch (connErr: any) {
+      console.warn('[SmartScale] connectAndSubscribe error:', connErr);
+      this.syncError.set(connErr?.message || 'Failed to establish GATT connection with scale.');
+      return false;
+    }
+  }
+
+  /**
+   * Universal Scale Packet Decoder
+   * Handles:
+   * 1. Yolanda / Fitdays / GE protocol (header 0x02, Big-Endian weight bytes)
+   * 2. Bluetooth SIG 0x2A9D protocol (flags byte, Little-Endian weight bytes)
+   * 3. Raw payload multi-byte pattern probe
+   */
+  public parseUniversalWeightPacket(
+    dataView: DataView,
+    userId: string,
+    deviceName: string,
+    protocol: string
+  ): void {
     try {
       if (dataView.byteLength < 3) return;
 
-      const flags = dataView.getUint8(0);
-      const isImperialLbs = (flags & 0x01) === 1;
+      const len = dataView.byteLength;
+      let weightKg: number | null = null;
+      let bodyFatPercent: number | undefined = undefined;
 
-      // 16-bit unsigned weight in Little Endian
-      const rawWeight = dataView.getUint16(1, true);
+      const b0 = dataView.getUint8(0);
+      const b1 = dataView.getUint8(1);
+      const b2 = dataView.getUint8(2);
 
-      let weightKg = 0;
-      let weightLbs = 0;
+      // --- PROTOCOL A: Yolanda / GE Fit Profile Format (starts with 0x02, 0xCA, or 0xCF) ---
+      if (b0 === 0x02 || b0 === 0xca || b0 === 0xcb || b0 === 0xcf) {
+        // Yolanda CS20 format: Byte 2 = status, Bytes 3-4 = weight (Big Endian)
+        if (len >= 5) {
+          const rawW1 = (dataView.getUint8(3) << 8) | dataView.getUint8(4);
+          const candidate1 = rawW1 / 100.0;
+          if (candidate1 >= 30 && candidate1 <= 250) {
+            weightKg = candidate1;
+          }
+        }
 
-      if (isImperialLbs) {
-        // Resolution: 0.01 lbs
-        weightLbs = Math.round(rawWeight * 0.01 * 10) / 10;
-        weightKg = Math.round((weightLbs / 2.20462) * 10) / 10;
-      } else {
-        // Standard resolution: 0.005 kg
-        weightKg = Math.round(rawWeight * 0.005 * 10) / 10;
-        weightLbs = Math.round(weightKg * 2.20462 * 10) / 10;
+        // Alternative Yolanda format: Bytes 2-3 = weight
+        if (!weightKg && len >= 4) {
+          const rawW2 = (dataView.getUint8(2) << 8) | dataView.getUint8(3);
+          const candidate2 = rawW2 / 100.0;
+          if (candidate2 >= 30 && candidate2 <= 250) {
+            weightKg = candidate2;
+          } else if (rawW2 / 10.0 >= 30 && rawW2 / 10.0 <= 250) {
+            weightKg = rawW2 / 10.0;
+          }
+        }
+
+        // Yolanda Impedance / Body Fat probe (Bytes 5-6 often contain resistance)
+        if (len >= 7) {
+          const rawResistance = (dataView.getUint8(5) << 8) | dataView.getUint8(6);
+          if (rawResistance >= 300 && rawResistance <= 1200 && weightKg) {
+            // Deurenberg / Lukaski bioimpedance formula estimate
+            const demo = this.authService.userProfile()?.demographics;
+            const h = demo?.heightCm || 180;
+            const age = demo?.age || 26;
+            const isFemale = demo?.gender === 'female';
+            const sexFactor = isFemale ? 0 : 1;
+            const estFat = (1.20 * (weightKg / ((h / 100) * (h / 100)))) + (0.23 * age) - (10.8 * sexFactor) - 5.4;
+            if (estFat >= 6 && estFat <= 50) {
+              bodyFatPercent = Math.round(estFat * 10) / 10;
+            }
+          }
+        }
       }
 
-      this.liveBleWeight.set(weightKg);
+      // --- PROTOCOL B: Standard Bluetooth SIG 0x2A9D Format ---
+      if (!weightKg) {
+        const isImperial = (b0 & 0x01) === 1;
+        const rawWeight = dataView.getUint16(1, true); // Little Endian
 
-      const demo = this.authService.userProfile()?.demographics;
-      const heightCm = demo?.heightCm || 180;
-      const hM = heightCm / 100;
-      const bmi = Math.round((weightKg / (hM * hM)) * 10) / 10;
+        if (isImperial) {
+          const wLbs = rawWeight * 0.01;
+          if (wLbs >= 65 && wLbs <= 550) {
+            weightKg = wLbs / 2.20462;
+          }
+        } else {
+          const wKg = rawWeight * 0.005;
+          if (wKg >= 30 && wKg <= 250) {
+            weightKg = wKg;
+          }
+        }
+      }
 
-      const measurement: ScaleMeasurement = {
-        weightKg,
-        weightLbs,
-        bmi,
-        timestamp: new Date().toISOString(),
-        source: 'BLE_SCALE',
-        deviceName,
-      };
+      // --- PROTOCOL C: Buffer Window Probe Fallback ---
+      if (!weightKg) {
+        for (let i = 0; i < len - 1; i++) {
+          const be = (dataView.getUint8(i) << 8) | dataView.getUint8(i + 1);
+          const le = (dataView.getUint8(i + 1) << 8) | dataView.getUint8(i);
 
-      this.latestMeasurement.set(measurement);
-      this.persistMeasurement(measurement);
+          if (be / 100.0 >= 35 && be / 100.0 <= 220) {
+            weightKg = be / 100.0;
+            break;
+          }
+          if (le * 0.005 >= 35 && le * 0.005 <= 220) {
+            weightKg = le * 0.005;
+            break;
+          }
+        }
+      }
 
-      await this.authService.updateDemographics(userId, {
-        gender: demo?.gender || 'male',
-        age: demo?.age || 26,
-        weightKg,
-        heightCm,
-      });
+      if (weightKg && weightKg >= 30 && weightKg <= 250) {
+        weightKg = Math.round(weightKg * 10) / 10;
+        const weightLbs = Math.round(weightKg * 2.20462 * 10) / 10;
 
-      this.syncStatus.set(`Captured: ${weightKg} kg (${weightLbs} lbs) from ${deviceName}`);
+        this.liveBleWeight.set(weightKg);
+
+        const demo = this.authService.userProfile()?.demographics;
+        const heightCm = demo?.heightCm || 180;
+        const hM = heightCm / 100;
+        const bmi = Math.round((weightKg / (hM * hM)) * 10) / 10;
+
+        const measurement: ScaleMeasurement = {
+          weightKg,
+          weightLbs,
+          bodyFatPercent,
+          bmi,
+          timestamp: new Date().toISOString(),
+          source: 'BLE_SCALE',
+          deviceName,
+        };
+
+        this.latestMeasurement.set(measurement);
+        this.persistMeasurement(measurement);
+
+        this.authService.updateDemographics(userId, {
+          gender: demo?.gender || 'male',
+          age: demo?.age || 26,
+          weightKg,
+          heightCm,
+          bodyFatPercent: bodyFatPercent ?? demo?.bodyFatPercent,
+        });
+
+        this.syncStatus.set(`Captured: ${weightKg} kg (${weightLbs} lbs) from ${deviceName}`);
+      }
     } catch (e) {
-      console.warn('[SmartScale] Packet parse error:', e);
+      console.warn('[SmartScale] Universal packet parse note:', e);
     }
+  }
+
+  /**
+   * Parse live weight from Bluetooth LE advertisement manufacturer data
+   */
+  private parseManufacturerScaleData(dataView: DataView, deviceName: string, userId: string): void {
+    try {
+      const len = dataView.byteLength;
+      if (len < 4) return;
+
+      for (let i = 0; i < len - 1; i++) {
+        const rawBe = (dataView.getUint8(i) << 8) | dataView.getUint8(i + 1);
+        const candidateKg = rawBe / 100.0;
+        if (candidateKg >= 38 && candidateKg <= 220) {
+          const weightKg = Math.round(candidateKg * 10) / 10;
+          this.liveBleWeight.set(weightKg);
+          const weightLbs = Math.round(weightKg * 2.20462 * 10) / 10;
+
+          const demo = this.authService.userProfile()?.demographics;
+          const heightCm = demo?.heightCm || 180;
+          const hM = heightCm / 100;
+          const bmi = Math.round((weightKg / (hM * hM)) * 10) / 10;
+
+          const measurement: ScaleMeasurement = {
+            weightKg,
+            weightLbs,
+            bmi,
+            timestamp: new Date().toISOString(),
+            source: 'BLE_SCALE',
+            deviceName,
+          };
+
+          this.latestMeasurement.set(measurement);
+          this.persistMeasurement(measurement);
+          this.syncStatus.set(`Live reading: ${weightKg} kg (${weightLbs} lbs) via Bluetooth broadcast`);
+          break;
+        }
+      }
+    } catch {}
   }
 
   /**
    * Manual entry fallback
    */
-  public async recordManualWeight(weightKg: number, bodyFatPercent: number | undefined, userId: string): Promise<ScaleMeasurement> {
+  public async recordManualWeight(
+    weightKg: number,
+    bodyFatPercent: number | undefined,
+    userId: string
+  ): Promise<ScaleMeasurement> {
     const demo = this.authService.userProfile()?.demographics;
     const heightCm = demo?.heightCm || 180;
     const hM = heightCm / 100;

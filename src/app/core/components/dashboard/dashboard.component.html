@@ -2011,16 +2011,21 @@
             >
               {{ smartScale.isSyncing() ? 'SYNCING HEALTH CONNECT...' : '⚡ SYNC FROM HEALTH CONNECT / FIT' }}
             </button>
+
+            <!-- Health Connect Permissions Guidance -->
+            <div class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-200/90 leading-relaxed font-sans">
+              💡 <strong>Note:</strong> When prompted, toggle <strong>Allow all</strong> or <strong>Weight & Body Fat</strong> for Vagus in the Health Connect sheet. If no records appear, verify your weigh-in is visible in the <em>Health Connect</em> or <em>Fit Profile</em> app first.
+            </div>
           </div>
 
           <!-- Method 2: Direct Bluetooth Low Energy (BLE) Weigh-In -->
           <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] space-y-2 font-sans">
             <div class="flex items-center justify-between font-mono">
               <span class="text-xs font-bold text-cyan-300 uppercase">2. Direct Bluetooth LE Scale Pairing</span>
-              <span class="text-[9px] px-2 py-0.5 rounded-full bg-white/[0.05] text-zinc-400">UUID 0x181D</span>
+              <span class="text-[9px] px-2 py-0.5 rounded-full bg-white/[0.05] text-zinc-400">0x181D & 0xFFF0</span>
             </div>
             <p class="text-[11px] text-zinc-400 leading-relaxed">
-              Step on your GE Fit Profile Smart Scale with bare feet to power on the Bluetooth broadcast, then pair directly to stream weight live via BLE:
+              Step on your GE Fit Profile Smart Scale with bare feet to wake up the Bluetooth broadcast, then tap below:
             </p>
             <button
               type="button"
@@ -2028,7 +2033,7 @@
               [disabled]="smartScale.isBleScanning()"
               class="w-full py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-cyan-500/30 text-cyan-300 font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
-              {{ smartScale.isBleScanning() ? 'SCANNING FOR GE SCALE...' : '📶 CONNECT GE SCALE VIA BLUETOOTH' }}
+              {{ smartScale.isBleScanning() ? 'SCANNING FOR GE SCALE (STAND ON SCALE)...' : '📶 CONNECT GE SCALE VIA BLUETOOTH' }}
             </button>
           </div>
 
