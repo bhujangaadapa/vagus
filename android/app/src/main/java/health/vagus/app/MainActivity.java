@@ -1,7 +1,15 @@
 package health.vagus.app;
 
 import android.Manifest;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothManager;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanRecord;
+import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.hardware.Sensor;
@@ -28,6 +36,9 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     private static final String KEY_BASELINE = "step_baseline";
     private static final String KEY_LAST_RAW = "last_raw_hardware_steps";
 
+    private BluetoothLeScanner nativeBleScanner = null;
+    private ScanCallback nativeBleScanCallback = null;
+
     private SensorManager sensorManager;
     private Sensor stepCounterSensor;
     private Sensor stepDetectorSensor;
@@ -51,6 +62,18 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
                     permList.add(Manifest.permission.ACTIVITY_RECOGNITION);
+                }
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                    permList.add(Manifest.permission.BLUETOOTH_SCAN);
+                }
+                if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    permList.add(Manifest.permission.BLUETOOTH_CONNECT);
+                }
+            } else {
+                if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    permList.add(Manifest.permission.ACCESS_FINE_LOCATION);
                 }
             }
             if (!permList.isEmpty()) {
@@ -77,6 +100,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                 settings.setJavaScriptCanOpenWindowsAutomatically(true);
 
                 webView.addJavascriptInterface(new HardwareStepBridge(), "AndroidHardwarePedometer");
+                webView.addJavascriptInterface(new AndroidScaleBridge(), "AndroidScaleBridge");
 
                 // Immediately dispatch stored persistent footsteps on app launch or resume
                 int stored = getStoredTodaySteps();
@@ -283,5 +307,146 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                 });
             }
         }
+    }
+
+    public class AndroidScaleBridge {
+        @JavascriptInterface
+        public void startScaleScan() {
+            startNativeScaleScan();
+        }
+
+        @JavascriptInterface
+        public void stopScaleScan() {
+            stopNativeScaleScan();
+        }
+
+        @JavascriptInterface
+        public boolean isBluetoothEnabled() {
+            try {
+                BluetoothManager bm = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+                return bm != null && bm.getAdapter() != null && bm.getAdapter().isEnabled();
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        @JavascriptInterface
+        public void openHealthConnectSettings() {
+            try {
+                Intent intent = new Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS");
+                startActivity(intent);
+            } catch (Exception e) {
+                try {
+                    Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                    intent.setData(android.net.Uri.fromParts("package", getPackageName(), null));
+                    startActivity(intent);
+                } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    private synchronized void startNativeScaleScan() {
+        try {
+            BluetoothManager bm = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+            if (bm == null) return;
+            BluetoothAdapter adapter = bm.getAdapter();
+            if (adapter == null || !adapter.isEnabled()) return;
+
+            nativeBleScanner = adapter.getBluetoothLeScanner();
+            if (nativeBleScanner == null) return;
+
+            if (nativeBleScanCallback == null) {
+                nativeBleScanCallback = new ScanCallback() {
+                    @Override
+                    public void onScanResult(int callbackType, ScanResult result) {
+                        parseNativeBleScaleResult(result);
+                    }
+                    @Override
+                    public void onBatchScanResults(java.util.List<ScanResult> results) {
+                        for (ScanResult r : results) {
+                            parseNativeBleScaleResult(r);
+                        }
+                    }
+                };
+            }
+
+            ScanSettings settings = new ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .build();
+
+            nativeBleScanner.startScan(null, settings, nativeBleScanCallback);
+        } catch (Exception e) {
+            android.util.Log.w("MainActivity", "Native BLE scan error: " + e.getMessage());
+        }
+    }
+
+    private synchronized void stopNativeScaleScan() {
+        try {
+            if (nativeBleScanner != null && nativeBleScanCallback != null) {
+                nativeBleScanner.stopScan(nativeBleScanCallback);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void parseNativeBleScaleResult(ScanResult result) {
+        if (result == null) return;
+        try {
+            android.bluetooth.BluetoothDevice device = result.getDevice();
+            ScanRecord record = result.getScanRecord();
+            String name = null;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                    name = device != null ? device.getName() : null;
+                }
+            } else {
+                name = device != null ? device.getName() : null;
+            }
+            if (name == null && record != null) {
+                name = record.getDeviceName();
+            }
+
+            byte[] bytes = record != null ? record.getBytes() : null;
+            if (bytes == null || bytes.length < 5) return;
+
+            double foundWeightKg = 0;
+            for (int i = 0; i < bytes.length - 1; i++) {
+                int b1 = bytes[i] & 0xFF;
+                int b2 = bytes[i + 1] & 0xFF;
+                int rawBe = (b1 << 8) | b2;
+                int rawLe = (b2 << 8) | b1;
+
+                for (int raw : new int[]{rawBe, rawLe}) {
+                    double cand1 = raw / 100.0;
+                    if (cand1 >= 35.0 && cand1 <= 240.0) {
+                        foundWeightKg = cand1;
+                        break;
+                    }
+                    double cand2 = raw / 10.0;
+                    if (cand2 >= 35.0 && cand2 <= 240.0) {
+                        foundWeightKg = cand2;
+                        break;
+                    }
+                    double cand3 = (raw / 10.0) / 2.20462;
+                    if (cand3 >= 35.0 && cand3 <= 240.0) {
+                        foundWeightKg = cand3;
+                        break;
+                    }
+                }
+                if (foundWeightKg > 0) break;
+            }
+
+            if (foundWeightKg > 0) {
+                final double finalWeight = Math.round(foundWeightKg * 10.0) / 10.0;
+                final String finalName = (name != null && !name.isEmpty()) ? name : "GE Fit Profile Scale";
+                runOnUiThread(() -> {
+                    WebView webView = getBridge().getWebView();
+                    if (webView != null) {
+                        String js = "window.dispatchEvent(new CustomEvent('androidScaleWeight', { detail: { weightKg: " 
+                            + finalWeight + ", deviceName: '" + finalName.replace("'", "") + "' } }));";
+                        webView.evaluateJavascript(js, null);
+                    }
+                });
+            }
+        } catch (Exception ignored) {}
     }
 }

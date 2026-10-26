@@ -1992,6 +1992,10 @@
             <div *ngIf="smartScale.syncError()" class="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-[10px] font-mono">
               ⚠️ {{ smartScale.syncError() }}
             </div>
+
+            <div *ngIf="smartScale.debugLog()" class="p-2 rounded-xl bg-zinc-900/80 border border-amber-500/20 text-amber-200/80 text-[10px] font-mono break-all">
+              ℹ️ Diagnostic: {{ smartScale.debugLog() }}
+            </div>
           </div>
 
           <!-- Method 1: Google Health Connect / Google Fit Bridge -->
@@ -2010,6 +2014,15 @@
               class="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.25)] disabled:opacity-50"
             >
               {{ smartScale.isSyncing() ? 'SYNCING HEALTH CONNECT...' : '⚡ SYNC FROM HEALTH CONNECT / FIT' }}
+            </button>
+
+            <button
+              type="button"
+              (click)="openHealthConnectSettings()"
+              class="w-full py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-amber-500/20 text-amber-300 font-mono text-[10px] font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <span>⚙️</span>
+              <span>CHECK / CONFIGURE HEALTH CONNECT PERMISSIONS</span>
             </button>
 
             <!-- Health Connect Permissions Guidance -->

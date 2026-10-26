@@ -4,11 +4,16 @@
     "HEART_RATE": "Read",
     "SLEEP": "Read",
     "CALORIES_BURNED": "Read",
-    "DISTANCE": "Read"
+    "DISTANCE": "Read",
+    "WEIGHT": "ReadWrite",
+    "BODY_FAT_PERCENTAGE": "Read",
+    "HEIGHT": "Read",
+    "BASAL_METABOLIC_RATE": "Read"
   },
   "groupPermissions": {
     "FITNESS_VARIABLES": "ReadWrite",
-    "HEALTH_VARIABLES": "Read"
+    "HEALTH_VARIABLES": "Read",
+    "PROFILE_VARIABLES": "ReadWrite"
   },
   "privacyPolicyUrl": "https://bhujangaadapa.github.io/vagus/privacy-policy.html"
 }
