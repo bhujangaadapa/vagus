@@ -343,6 +343,24 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                 } catch (Exception ignored) {}
             }
         }
+
+        @JavascriptInterface
+        public void openFitProfileApp() {
+            try {
+                Intent intent = getPackageManager().getLaunchIntentForPackage("com.app.ge");
+                if (intent != null) {
+                    startActivity(intent);
+                } else {
+                    Intent marketIntent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=com.app.ge"));
+                    startActivity(marketIntent);
+                }
+            } catch (Exception e) {
+                try {
+                    Intent webIntent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/apps/details?id=com.app.ge"));
+                    startActivity(webIntent);
+                } catch (Exception ignored) {}
+            }
+        }
     }
 
     private synchronized void startNativeScaleScan() {

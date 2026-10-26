@@ -1998,62 +1998,83 @@
             </div>
           </div>
 
-          <!-- Method 1: Google Health Connect / Google Fit Bridge -->
-          <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] space-y-2 font-sans">
-            <div class="flex items-center justify-between font-mono">
-              <span class="text-xs font-bold text-amber-300 uppercase">1. Google Health Connect Bridge</span>
-              <span *ngIf="smartScale.isSyncing()" class="text-[10px] text-amber-400 animate-pulse">QUERYING...</span>
+          <!-- Method 1: Connected App Bridge — Fit Profile (GE Scale) -->
+          <div class="p-4 rounded-2xl bg-zinc-900/60 border border-white/[0.08] space-y-3 font-sans">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-600/30 border border-amber-500/40 flex items-center justify-center text-amber-300 text-sm font-bold">
+                  ⚖️
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-zinc-100 uppercase tracking-wide">Fit Profile App (GE Scale)</span>
+                    <span
+                      class="text-[9px] px-2 py-0.5 rounded-full font-mono font-bold"
+                      [ngClass]="smartScale.isFitProfileAttached() ? 'bg-emerald-500/20 text-[#00F5A0] border border-[#00F5A0]/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'"
+                    >
+                      {{ smartScale.isFitProfileAttached() ? '● ATTACHED' : '○ READY TO ATTACH' }}
+                    </span>
+                  </div>
+                  <p class="text-[10px] text-zinc-400">Attached via Google Health Connect / Google Fit</p>
+                </div>
+              </div>
             </div>
-            <p class="text-[11px] text-zinc-400 leading-relaxed">
-              When you weigh in with your <strong class="text-zinc-200">GE Fit Profile scale</strong>, the Fit Profile app automatically syncs weight, body fat %, and BMI to <strong class="text-zinc-200">Google Health Connect</strong>. Tap below to import the latest weigh-in into Vagus:
-            </p>
-            <button
-              type="button"
-              (click)="syncScaleHealthConnect()"
-              [disabled]="smartScale.isSyncing()"
-              class="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.25)] disabled:opacity-50"
-            >
-              {{ smartScale.isSyncing() ? 'SYNCING HEALTH CONNECT...' : '⚡ SYNC FROM HEALTH CONNECT / FIT' }}
-            </button>
+
+            <!-- How It Works Architecture Pipeline -->
+            <div class="p-2.5 rounded-xl bg-black/40 border border-white/[0.04] text-[11px] text-zinc-300 leading-relaxed space-y-1.5">
+              <div class="flex items-center gap-1.5 text-zinc-400 font-mono text-[10px]">
+                <span class="text-amber-400 font-bold">1. GE Scale</span>
+                <span>➔</span>
+                <span class="text-cyan-400 font-bold">2. Fit Profile App</span>
+                <span>➔</span>
+                <span class="text-[#00F5A0] font-bold">3. Vagus (Automatic)</span>
+              </div>
+              <p class="text-[10px] text-zinc-400 leading-relaxed">
+                Fit Profile handles your scale over Bluetooth and saves your weight to Health Connect. Vagus attaches directly to that pipeline so your weight & body composition sync automatically every day without Bluetooth pairing issues.
+              </p>
+            </div>
+
+            <!-- Action Buttons: Sync Now + Open Fit Profile -->
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                (click)="syncScaleHealthConnect()"
+                [disabled]="smartScale.isSyncing()"
+                class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-mono font-bold text-[11px] uppercase tracking-wider transition-all cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.25)] flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                <span>{{ smartScale.isSyncing() ? '⏳' : '🔄' }}</span>
+                <span>{{ smartScale.isSyncing() ? 'SYNCING...' : 'SYNC FROM FIT PROFILE' }}</span>
+              </button>
+
+              <button
+                type="button"
+                (click)="openFitProfileApp()"
+                class="py-2.5 px-3 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] text-zinc-200 font-mono font-bold text-[11px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <span>📱</span>
+                <span>OPEN FIT PROFILE</span>
+              </button>
+            </div>
 
             <button
               type="button"
               (click)="openHealthConnectSettings()"
-              class="w-full py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-amber-500/20 text-amber-300 font-mono text-[10px] font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              class="w-full py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-zinc-400 hover:text-zinc-200 font-mono text-[10px] transition-all cursor-pointer flex items-center justify-center gap-1.5"
             >
               <span>⚙️</span>
               <span>CHECK / CONFIGURE HEALTH CONNECT PERMISSIONS</span>
             </button>
 
-            <!-- Health Connect Permissions Guidance -->
+            <!-- Fit Profile Setup Tip -->
             <div class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-200/90 leading-relaxed font-sans">
-              💡 <strong>Note:</strong> When prompted, toggle <strong>Allow all</strong> or <strong>Weight & Body Fat</strong> for Vagus in the Health Connect sheet. If no records appear, verify your weigh-in is visible in the <em>Health Connect</em> or <em>Fit Profile</em> app first.
+              💡 <strong>Setup Tip:</strong> In the <em>Fit Profile</em> app, go to <strong>Me / Settings</strong> &rarr; <strong>Third-party Apps</strong> &rarr; toggle <strong>Google Fit / Health Connect: ON</strong>. Then whenever you weigh in on your GE scale, Vagus receives your weight automatically!
             </div>
           </div>
 
-          <!-- Method 2: Direct Bluetooth Low Energy (BLE) Weigh-In -->
+          <!-- Method 2: Manual Weigh-In Entry -->
           <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] space-y-2 font-sans">
             <div class="flex items-center justify-between font-mono">
-              <span class="text-xs font-bold text-cyan-300 uppercase">2. Direct Bluetooth LE Scale Pairing</span>
-              <span class="text-[9px] px-2 py-0.5 rounded-full bg-white/[0.05] text-zinc-400">0x181D & 0xFFF0</span>
-            </div>
-            <p class="text-[11px] text-zinc-400 leading-relaxed">
-              Step on your GE Fit Profile Smart Scale with bare feet to wake up the Bluetooth broadcast, then tap below:
-            </p>
-            <button
-              type="button"
-              (click)="connectBleScale()"
-              [disabled]="smartScale.isBleScanning()"
-              class="w-full py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-cyan-500/30 text-cyan-300 font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
-            >
-              {{ smartScale.isBleScanning() ? 'SCANNING FOR GE SCALE (STAND ON SCALE)...' : '📶 CONNECT GE SCALE VIA BLUETOOTH' }}
-            </button>
-          </div>
-
-          <!-- Method 3: Manual Weigh-In Entry -->
-          <div class="p-3.5 rounded-2xl bg-black/40 border border-white/[0.04] space-y-2 font-sans">
-            <div class="flex items-center justify-between font-mono">
-              <span class="text-xs font-bold text-zinc-400 uppercase">3. Manual Weigh-In</span>
+              <span class="text-xs font-bold text-zinc-400 uppercase">2. Manual Weigh-In</span>
             </div>
             <p class="text-[11px] text-zinc-400 leading-relaxed">
               Enter your current scale reading manually to calibrate your BMR and TRIMP calorie engine:
@@ -2066,6 +2087,27 @@
               ✏️ LOG MANUAL WEIGH-IN
             </button>
           </div>
+
+          <!-- Method 3 (Advanced): Direct Bluetooth LE Scale Pairing (Optional) -->
+          <details class="p-3.5 rounded-2xl bg-black/30 border border-white/[0.03] space-y-2 font-sans group">
+            <summary class="flex items-center justify-between font-mono text-[11px] text-zinc-500 cursor-pointer select-none">
+              <span class="uppercase">Advanced: Direct Hardware BLE Scan</span>
+              <span class="text-[9px] px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-400">Optional</span>
+            </summary>
+            <div class="pt-2 space-y-2">
+              <p class="text-[10px] text-zinc-400 leading-relaxed">
+                Connect directly to scale hardware without using the Fit Profile app. Step on your scale with bare feet, then tap below:
+              </p>
+              <button
+                type="button"
+                (click)="connectBleScale()"
+                [disabled]="smartScale.isBleScanning()"
+                class="w-full py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-cyan-500/20 text-cyan-300 font-mono text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+              >
+                {{ smartScale.isBleScanning() ? 'SCANNING FOR BLE SCALE...' : '📶 SCAN HARDWARE SCALE VIA BLUETOOTH' }}
+              </button>
+            </div>
+          </details>
         </div>
       </section>
 

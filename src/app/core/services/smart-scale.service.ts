@@ -23,6 +23,11 @@ export class SmartScaleService {
   public readonly liveBleWeight = signal<number | null>(null);
   public readonly debugLog = signal<string | null>(null);
 
+  public readonly isFitProfileAttached = computed(() => {
+    const m = this.latestMeasurement();
+    return !!m && (m.source === 'HEALTH_CONNECT' || m.source === 'BLE_SCALE' || (typeof m.weightKg === 'number' && m.weightKg > 0));
+  });
+
   // Storage key for persistent cached scale reading
   private readonly storageKey = 'vagus_last_scale_measurement';
 
@@ -42,6 +47,28 @@ export class SmartScaleService {
   constructor() {
     this.restorePersistedMeasurement();
     this.listenToNativeScaleEvents();
+    this.setupAutoSync();
+  }
+
+  private setupAutoSync(): void {
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && Capacitor.isNativePlatform()) {
+          const uid = this.authService.userProfile()?.uid;
+          if (uid) {
+            this.syncWithHealthConnect(uid, true);
+          }
+        }
+      });
+      setTimeout(() => {
+        if (Capacitor.isNativePlatform()) {
+          const uid = this.authService.userProfile()?.uid;
+          if (uid) {
+            this.syncWithHealthConnect(uid, true);
+          }
+        }
+      }, 2000);
+    }
   }
 
   private listenToNativeScaleEvents(): void {
@@ -80,10 +107,12 @@ export class SmartScaleService {
    * Primary: Sync latest weigh-in from Google Health Connect (Android) / Apple Health (iOS).
    * The GE Fit Profile app automatically syncs weight, body fat %, and BMI to Health Connect.
    */
-  public async syncWithHealthConnect(userId: string): Promise<ScaleMeasurement | null> {
+  public async syncWithHealthConnect(userId: string, silent: boolean = false): Promise<ScaleMeasurement | null> {
     this.isSyncing.set(true);
-    this.syncError.set(null);
-    this.syncStatus.set('Connecting to Google Health Connect...');
+    if (!silent) {
+      this.syncError.set(null);
+      this.syncStatus.set('Syncing weigh-in from Fit Profile via Health Connect...');
+    }
 
     const isNative = Capacitor.isNativePlatform();
 
@@ -103,13 +132,13 @@ export class SmartScaleService {
         bmi,
         timestamp: new Date().toISOString(),
         source: 'HEALTH_CONNECT',
-        deviceName: 'GE Fit Profile Smart Scale (Health Connect)',
+        deviceName: 'GE Fit Profile Scale',
       };
 
       this.latestMeasurement.set(sim);
       this.persistMeasurement(sim);
       this.isSyncing.set(false);
-      this.syncStatus.set('Synced scale reading via Health Connect.');
+      this.syncStatus.set(`Fit Profile Synced: ${weightLbs} lbs (${weightKg} kg)`);
       return sim;
     }
 
@@ -235,10 +264,12 @@ export class SmartScaleService {
       }
 
       if (!measuredWeightKg) {
-        this.syncError.set(
-          'No weight records found in Health Connect. Ensure Fit Profile has synced to Health Connect, and Vagus is granted "Read Weight" in Android Settings > Apps > Health Connect > App permissions.'
-        );
-        this.syncStatus.set('Awaiting weigh-in records in Google Health Connect.');
+        if (!silent) {
+          this.syncError.set(
+            'No weight records found yet. Step on your GE scale with Fit Profile, then tap Sync. Make sure Vagus has "Read Weight" enabled in Health Connect.'
+          );
+          this.syncStatus.set('Awaiting weigh-in records from Fit Profile.');
+        }
         return null;
       }
 
@@ -256,7 +287,7 @@ export class SmartScaleService {
         bmi,
         timestamp,
         source: 'HEALTH_CONNECT',
-        deviceName: 'GE Fit Profile Scale (Health Connect)',
+        deviceName: 'GE Fit Profile Scale',
       };
 
       this.latestMeasurement.set(measurement);
@@ -271,16 +302,34 @@ export class SmartScaleService {
         bodyFatPercent,
       });
 
-      this.syncStatus.set(`Synced: ${measuredWeightKg} kg (${weightLbs} lbs) from Google Health Connect`);
+      this.syncStatus.set(`Fit Profile Synced: ${weightLbs} lbs (${measuredWeightKg} kg)`);
       return measurement;
     } catch (err: any) {
       console.error('[SmartScale] Health Connect sync failed:', err);
-      this.syncError.set(err?.message || 'Failed to query Google Health Connect.');
-      this.syncStatus.set('Sync error with Google Health Connect.');
+      if (!silent) {
+        this.syncError.set(err?.message || 'Failed to query Fit Profile weight records.');
+        this.syncStatus.set('Sync error with Health Connect.');
+      }
       return null;
     } finally {
       this.isSyncing.set(false);
     }
+  }
+
+  /**
+   * Directly launch the Fit Profile (GE Smart Scale) app on Android
+   */
+  public openFitProfileApp(): void {
+    try {
+      const bridge = (window as any).AndroidScaleBridge;
+      if (bridge && typeof bridge.openFitProfileApp === 'function') {
+        bridge.openFitProfileApp();
+        return;
+      }
+      if (typeof window !== 'undefined') {
+        window.open('https://play.google.com/store/apps/details?id=com.app.ge', '_blank');
+      }
+    } catch {}
   }
 
   /**

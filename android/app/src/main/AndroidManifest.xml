@@ -92,8 +92,10 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY"/>
 
-    <!-- Package visibility for Health Connect -->
+    <!-- Package visibility for Health Connect, Fit Profile, and Google Fit -->
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
+        <package android:name="com.app.ge" />
+        <package android:name="com.google.android.apps.fitness" />
     </queries>
 </manifest>

@@ -894,6 +894,10 @@ export class DashboardComponent implements OnInit {
     await this.smartScale.syncWithHealthConnect(this.activeUserId());
   }
 
+  public openFitProfileApp(): void {
+    this.smartScale.openFitProfileApp();
+  }
+
   public async openHealthConnectSettings(): Promise<void> {
     await this.smartScale.openHealthConnectSettings();
   }
